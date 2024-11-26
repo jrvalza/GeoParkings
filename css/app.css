@@ -33,10 +33,20 @@ html, body {
     z-index: 1;/*indice para situar el mapa debajo del menu*/
 }
 
+#coordinates-text{
+    width: 90%;
+    height: 30px;
+    line-height: 30px;
+    vertical-align: middle;
+    border-radius: 10px;
+    padding-left: 10px;
+    outline: none;
+}
+
 /*Espacio del menú*/
 #menu{
     width: 60PX;
-    height: 360PX;
+    height: 120PX;
     border-radius: 20px;
     position: fixed;
     right: 10px;
@@ -78,26 +88,3 @@ html, body {
     z-index: 0; /*indice para situar el mapa debajo del menu*/
 }
 
-
-
-#point-id {
-    height: 40px;
-    width: 100%;
-    bottom: 20px;
-    display: flex;
-    position: fixed;
-    text-align: center;
-    align-items: center;
-    background-color: transparent;
-    z-index: 1;
-}
-
-#point-id-text{
-    width: 90%;
-    height: 30px;
-    line-height: 30px;
-    vertical-align: middle;
-    border-radius: 10px;
-    padding-left: 10px;
-    outline: none;
-}

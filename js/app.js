@@ -9,7 +9,7 @@ var watchID = null;
 
 //GeoJSON of points
 var point ={
-    "id": null,
+    "name": "current position",
     "type": "Feature",
     "geometry": {
         "type": "Point",
@@ -22,7 +22,7 @@ var point ={
 //1-) GPS receiver  2-) Wifi  3-) IP Adress
 var geolocationOptions = {
     enableHighAccuracy: true, //GPS
-    Timeout: 10000 //10seg
+    timeout: 10000 //10seg
 }
 
 //Store points
@@ -68,6 +68,13 @@ var baseMaps = {"osm": osm, "pnoa": pnoa};
 //Format coordinates
 var format = "geo";
 
+
+// JSON de informacion de parkings
+var jsonObjectParkings;
+
+// global count to API parkings request
+count = 0;
+
 //====================================================================================================================
 //=========================================End global variables=======================================================
 //====================================================================================================================
@@ -78,16 +85,16 @@ var format = "geo";
 //initial point for cordova apps
 function onDeviceReady(){
     //Click events similar to onclick but in JS
-
     document.getElementsByClassName("fa-solid fa-location-dot")[0].addEventListener("click", toggleLocation);
-    document.getElementsByClassName("fa-solid fa-keyboard")[0].addEventListener("click", toggleIDBox);
-    document.getElementsByClassName("fa-solid fa-square-plus")[0].addEventListener("click", storePoint);
     document.getElementsByClassName("fa-solid fa-square-minus")[0].addEventListener("click", clearMemory);
     document.getElementsByClassName("fa-solid fa-layer-group")[0].addEventListener("click", switchBaseMap);
-    document.getElementsByClassName("fa-solid fa-floppy-disk")[0].addEventListener("click", saveToGeoJSON);
 
     //lab4
-    document.getElementById("coordinates").addEventListener("click", () => {
+    document.getElementById("coordinates").addEventListener("click", currentFormatCoordinates)
+}
+
+
+function currentFormatCoordinates () {
         if (format == "geo") {
             format = "dms";
         } else if (format == "dms") {
@@ -97,19 +104,14 @@ function onDeviceReady(){
         }
         //update format coordinates
         formatCoordinates();
-    });
 }
-
-
-
-
 
 
 //====================================================================================================================
 //===============================================Geolocation==========================================================
 //====================================================================================================================
 
-function getLocation(){
+/*function getLocation(){
     //Check browser support
     if (navigator.geolocation){//navigator.geolocation != undefined
         //alert("Geolocation service available.");
@@ -122,12 +124,9 @@ function getLocation(){
     }
 }
 
+*/
 
-
-
-
-
-function formatCoordinates(event){
+function formatCoordinates(){
     //Check there are coordinates
     if (point.geometry.coordinates[0] == undefined){
         alert("Collect coordinates before change format.");
@@ -252,10 +251,6 @@ function formatCoordinates(event){
 
 
 
-
-
-
-
 function geolocationSucess(position){
     //fill a var point (geojson)
     point.geometry.coordinates = [position.coords.longitude, position.coords.latitude];
@@ -269,8 +264,15 @@ function geolocationSucess(position){
     //out
     console.log(JSON.stringify(point, null, 4));
     formatCoordinates();
-}
+	
+	//request GET --> apiParkings
+	timeoutGetParkings();
 
+	// show current position
+	showPoints();
+	
+	
+}
 
 
 
@@ -314,6 +316,8 @@ function toggleLocation(){
 
         //change icon color
         document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
+	
+		
     }else{
         //Stop Geolocation
         showToast("Stopping geolocation service.");
@@ -329,31 +333,6 @@ function toggleLocation(){
 
 
 
-
-
-
-//====================================================================================================================
-//===============================================User Input===========================================================
-//====================================================================================================================
-
-function toggleIDBox(){
-    //get tag html
-    var pointID = document.getElementById("point-id");
-
-    //Check visibility of IDBox
-    if (pointID.style.display == "none"){ //invisible
-        pointID.style.display = "block"; //make it visible
-
-    }else if (pointID.style.display == "block"){
-        pointID.style.display = "none"
-    }
-}
-//====================================================================================================================
-//=============================================End user Input=========================================================
-//====================================================================================================================
-
-
-
 //Toast, better than alert
 function showToast(message){
     var toast = document.getElementById("toast");
@@ -361,98 +340,6 @@ function showToast(message){
     toast.style.display = "block";
     setTimeout(function(){toast.style.display = "none";},5000); //5seg
 }
-
-
-
-
-
-//====================================================================================================================
-//=========================================Store point in memory======================================================
-//====================================================================================================================
-function storePoint(){
-    //alert("storePoint()");
-
-    //Check  there are coordinates
-    if (point.geometry.coordinates[0] === null || point.geometry.coordinates[1] === null){
-            /*
-                ==  check only value of variable
-                === check value and type of variable
-                || OR logical operator
-                && AND logical operator
-            */
-        alert("Collect coordinates before saving.");
-        return;
-    }
-
-    //Counter in string format
-    var counterPointID = ("0000" + pointArray.length.toString()).substring(-4);
-    //console.log(counterPointID);
-
-    //Point ID from text box
-    var pointIDText = document.getElementById("point-id-text");
-
-    if (pointIDText.value.trim() === "") {
-        //trim(): removes blank spaces at the beginning and end of the string (python strip())
-        var pointIDValue = counterPointID;
-        point.id = counterPointID;
-
-    }else{
-        var pointIDValue = pointIDText.value.trim();
-        point.id = pointIDValue;
-    }
-
-    //Properties: Point Counter
-    point.properties.count = counterPointID;
-
-    //Append current feature to point array as JSON (json -> string -> json)
-    pointArray.push(JSON.parse(JSON.stringify(point)));
-
-    // Reset text box
-    pointIDText.value = "";
-
-    // Hidden text box
-    var pointID = document.getElementById("point-id");
-    if (pointID.style.display == "block"){
-        pointID.style.display = "none"
-    }
-
-
-
-
-    // Draw point
-    //1 . Marker
-    var leafletPointID = L.circle(
-        point.geometry.coordinates.toReversed(),
-        leafletPointOptions);
-
-    // 2. Popup
-    var popup = "";
-    popup += "ID = " + point.properties.count + '<br>'; //'<br>' porque el popup es código html
-    popup += "Longitude = " + point.geometry.coordinates[0].toFixed(8) + '<br>';
-    popup += "Latitude = " + point.geometry.coordinates[1].toFixed(8) + '<br>';
-
-    // 3. Link popup
-    leafletPointID.bindPopup(popup);
-
-    // 4. Add point to map
-    leafletPointID.addTo(map);
-
-    // 5. add pointID to pointArray
-    leafletPointArray.push(leafletPointID);
-
-    // 6. zoom to point
-    map.setView(point.geometry.coordinates.toReversed(), 14);
-}
-//====================================================================================================================
-//=======================================End Store point in memory====================================================
-//====================================================================================================================
-
-
-
-
-
-
-
 
 
 
@@ -481,7 +368,7 @@ function clearMemory(){
     // Clear memory
     pointArray = [];
     var point ={
-        "id": null,
+        "name": "current position",
         "type": "Feature",
         "geometry": {
             "type": "Point",
@@ -529,42 +416,6 @@ function switchBaseMap(){
 
 
 
-
-
-//====================================================================================================================
-//=============================================Save GeoJSON===========================================================
-//====================================================================================================================
-function saveToGeoJSON(){
-    //alert("saveToGeoJSON()");
-
-    // Check there are data to save
-    if (pointArray.length == 0){
-        alert("There are no data collected yet.");
-        return;
-    }
-
-    var geoJSON ={
-        type: "FeatureCollection",
-        features: pointArray
-    };
-
-    //console.log(JSON.stringify(geoJSON, null, 4));
-
-    //FileName
-
-    //Save to physical device: Cordova
-}
-//====================================================================================================================
-//===========================================End Save GeoJSON=========================================================
-//====================================================================================================================
-
-
-
-
-
-
-
-
 //additional function to center the map on the current location
 function centerMap(){
     //alert("centerMap");
@@ -580,7 +431,108 @@ function centerMap(){
 
 
 
+function apiParkings() {
+	
+	var url = "https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets/parkings/records?";
+	
+	// Pattern to send GET requests, Patron para enviar solicitudes GET.
+	
+	//1. Create XHR instance
+	var xhr = new XMLHttpRequest();
+	
+	//2. Open and send requests, abrir y enviar la peticion
+	xhr.open("GET", url, true);
+	
+	// Parameter 1: HTTP verb
+	// Parameter 2: URL
+	// Parameter 3: true=ansynchronous, false=synchronous
+	
+	xhr.send();
+	
+	//3. Get the response
+	
+	xhr.onreadystatechange = function() {//Anonymous fuction
+		if(xhr.readyState == 4 && xhr.status == 200) { //&& = Logical AND
+			// We have a response
+			
+			var jsonText = xhr.responseText;
+			
+			// Convert text to Object
+			
+			jsonObjectParkings = JSON.parse(jsonText);
+			
+			console.log(JSON.stringify(jsonObjectParkings, null, 4));
+			
+		}			
+	}	
+}
 
 
+//====================================================================================================================
+//=========================================Store point in memory======================================================
+//====================================================================================================================
+function showPoints(){
+    //alert("storePoint()");
+
+    //Check  there are coordinates
+    if (point.geometry.coordinates[0] === null || point.geometry.coordinates[1] === null){
+            /*
+                ==  check only value of variable
+                === check value and type of variable
+                || OR logical operator
+                && AND logical operator
+            */
+        alert("Collect coordinates before saving.");
+        return;
+    }
+
+    //Append current feature to point array as JSON (json -> string -> json)
+    pointArray.push(JSON.parse(JSON.stringify(point)));
+
+    // Draw point
+    //1 . Marker
+    var leafletPointID = L.circle(
+        point.geometry.coordinates.toReversed(),
+        leafletPointOptions);
+
+    // 2. Popup
+    var popup = "";
+    popup += "Name = " + point.name + '<br>'; //'<br>' porque el popup es código html
+    popup += "Longitude = " + point.geometry.coordinates[0].toFixed(8) + '<br>';
+    popup += "Latitude = " + point.geometry.coordinates[1].toFixed(8) + '<br>';
+
+    // 3. Link popup
+    leafletPointID.bindPopup(popup);
+
+    // 4. Add point to map
+    leafletPointID.addTo(map);
+
+    // 5. add pointID to pointArray
+    leafletPointArray.push(leafletPointID);
+
+    // 6. zoom to point
+    map.setView(point.geometry.coordinates.toReversed(), 14);
+}
+//====================================================================================================================
+//=======================================End Store point in memory====================================================
+//====================================================================================================================
+
+function timeoutGetParkings (){
+	if (count==0){
+		apiParkings();
+		count=1;
+	}
+    // Calcular el tiempo hasta el próximo minuto exacto de la hora (HH:01)
+    const ahora = new Date();
+    const minutosParaProximaHora = 60 - ahora.getMinutes(); // Minutos restantes para llegar a la próxima hora
+    const segundosParaProximaHora = minutosParaProximaHora * 60 - ahora.getSeconds();
+    const milisegundosParaProximaHora = segundosParaProximaHora * 1000;
 
 
+    // Usar setTimeout para sincronizar con el minuto exacto de la próxima hora
+    setTimeout(() => {
+        count==0;
+        // Luego, programar cada hora y un minuto (3660 segundos)
+        setInterval(apiParkings, 3660 * 1000); // 3660 segundos = 1 hora y 1 minuto
+    }, milisegundosParaProximaHora);
+}
