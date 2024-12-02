@@ -20,6 +20,7 @@
         <!--onload es para que se ejecute una fucnion cuando se cargue el html-->
         <!--onDeviceReady(): en Cordova todo se ejecuta a partir de esta funcion-->
 
+        <!--Map screen-->
         <!--Show coordinates-->
         <div id="coordinates">
             <p id="coordinates-text"></p>
@@ -32,13 +33,29 @@
         <!--Icons-->
         <div id="menu">
             <i class="fa-solid fa-location-dot"></i>
-            <i class="fa-solid fa-layer-group"></i>
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <!--<i class="fa-solid fa-layer-group"></i>-->
         </div>
 
         <!--Toast-->
         <div>
-            <p id="toast" style="display: none;"></p>
+            <p id="toast" style="display: block;"></p>
         </div>
+
+        <!--initial screen-->
+        <div id="initial-screen-container">
+            <div class="initial-screen">
+                <h1>Geoparking App</h1>
+                <div class="animation">
+                    <video autoplay muted loop>
+                        <source src="./css/images/inicio.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <h2>Find your6 parking</h2>
+            </div>
+        </div>
+
+
 
         <!--Import js from local local folder-->
         <script language="JavaScript" type="text/javascript" src ="./js/leaflet.js"></script>
@@ -46,5 +63,4 @@
         <script language="JavaScript" type="text/javascript" src="./js/app.js"></script>
 
     </body>
-
 </html>
