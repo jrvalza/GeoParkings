@@ -6,6 +6,15 @@
 
 
 
+
+
+//--------------------------------Cordova Plugins--------------------------------
+
+var watchCompassID = null;
+var compassOptions = { frequency: 1000 };//1s
+var compassAngle = -45;
+
+
 //----------------------------------Geolocation----------------------------------
 
 //null=geolocation disable. not null=geolocation enable
@@ -105,8 +114,7 @@ var formatCoords = "geo";
 var refDistance = 1500;//1.5km
 var squareDistanceRef = Math.pow(refDistance, 2);
 
-//layer points options
-var compassAngle = 90;
+
 
 
 
@@ -121,6 +129,8 @@ var compassAngle = 90;
 //------------------------------------------------------------------------------------------------------------
 //---------------------------------------Initial point for cordova apps---------------------------------------
 //------------------------------------------------------------------------------------------------------------
+//initial point for cordova apps
+//document.addEventListener('deviceready', onDeviceReady, false);
 function onDeviceReady(){
     //Initial GUI
     initApp();
@@ -157,6 +167,8 @@ function currentFormatCoordinates () {
     formatCoordinates();
 }
 
+
+
 //conversion between coordinate systems
 function geoToUTM(geoPoint){
     //get UTM zone
@@ -173,6 +185,8 @@ function geoToUTM(geoPoint){
 
     return [utmPoint, zone];
 }
+
+
 
 //change the current format coordinates
 function formatCoordinates(){
@@ -311,6 +325,9 @@ function toggleLocation(){
         navigator.geolocation.clearWatch(watchID)// clean geolocation
         watchID=null;
 
+        //Stop the compass sensor
+        //stopWatchCompass();
+
         //---------------Stop making GET requests---------------
 
         // Clear timeout and interval
@@ -354,22 +371,21 @@ function geolocationSucess(position){
     console.log("parkingArray: " + parkingArray.length)
     console.log("nearParkingArray: " + nearParkingArray.length)
     console.log("leafletPointArray: " + leafletPointArray.length)
+    //Watch the compass sensor
+    //startWatchCompass();
     //update compass direction
     compassAngle += -20;
 
-
-    //Clear map leaflet
-    for (var count = 0; count < leafletPointArray.length; count++){
-        map.removeLayer(leafletPointArray[count]);
-    }
-    leafletPointArray = [];
     //show new points in map
 	showPoints();
+
+    //zoom to existing map elements
 }
 
 
 //Geolocation error function
 function geolocationError(error){
+
     //reset default values
     watchID=null;
     document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
@@ -617,6 +633,14 @@ function getCustomParkingIcon(point) {
 
 function showPoints(){
 
+    //Clear map leaflet each new user position
+    if (leafletPointArray.length !== 0){
+        for (var count = 0; count < leafletPointArray.length; count++){
+            map.removeLayer(leafletPointArray[count]);
+        };
+    }
+    leafletPointArray = [];
+
     //------show current position------
     //check there are coordinates
     if (currentPosition.geometry.coordinates.length === 0){
@@ -633,6 +657,7 @@ function showPoints(){
 
     //check there are coordinates
     if (nearParkingArray.length === 0){
+        document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
         return;
     }
     //draw points
@@ -760,29 +785,47 @@ function clearMemory(){
 
 
 //------------------------------------------------------------------------------------------------------------
-//----------------------------------------------Switch base maps----------------------------------------------
+//-----------------------------------------------Cordova Plugins----------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
-//Check current base map and make the change
-/*function switchBaseMap(){
+/*
+// Start watching the compass
+function startWatchCompass() {
+    if (watchCompassID === null){
+        watchCompassID = navigator.compass.watchHeading(onSuccessCompass, onErrorCompass, compassOptions);
+    }
+}
 
-    if(currentLayer == "osm"){
-        map.removeLayer(baseMaps["osm"]);
-        map.addLayer(baseMaps["pnoa"]);
-        currentLayer = "pnoa";
+//Stop watching the compass
+function stopWatchCompass() {
+    if (watchCompassID) {
+        navigator.compass.clearWatch(watchCompassID);// clean compass
+        watchCompassID = null;
+    }
+}
 
-    }else if (currentLayer == "pnoa"){
-        map.removeLayer(baseMaps["pnoa"]);
-        map.addLayer(baseMaps["osm"]);
-        currentLayer = "osm";
+//Get the current heading
+function onSuccessCompass(heading) {
+    //update global variable
+    compassAngle = -45 + heading.magneticHeading;
+}
+
+//Failed to get the heading
+function onErrorCompass(error) {
+    //reset default value
+    watchCompassID=null;
+
+    //error case evaluation
+    switch(error.code){
+        case error.COMPASS_INTERNAL_ERR:
+            showToast("compass request denied..");
+            break;
+        case error.COMPASS_NOT_SUPPORTED:
+            showToast("compass not supported.");
+            break;
     }
 }
 */
-
-
-
-
-
 
 
 
@@ -810,8 +853,6 @@ function findRoute(){
     }
     //----------------------Start navigation----------------------
     showToast("Starting navigation service.");
-
-    //console.log(nearParkingArray);
     console.log(selectedParkingCoords);
 }
 
@@ -823,42 +864,28 @@ function findRoute(){
 
 
 //------------------------------------------------------------------------------------------------------------
-//----------------------------------------------Other functions-----------------------------------------------
+//------------------------------------------Miscellaneous functions-------------------------------------------
 //------------------------------------------------------------------------------------------------------------
-
-//Toast, better than alert
-function showToast(message){
-    var toast = document.getElementById("toast");
-    toast.innerHTML = message;
-    toast.style.opacity= "1";
-
-    setTimeout(() =>{
-        toast.style.opacity= "0";
-    }, 3000); //3seg
-}
-
-
-
-
-
-
 
 function initApp(){
 
-    //Init
+    //Init-Get HTML elements
     var divMap = document.getElementById("map");
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
     var divInitialScreen = document.getElementById("initial-screen-container");
 
+    //hide HTML elements
     divMap.style.display = "None";
     divMenu.style.display = "None";
     divCoordinates.style.display ="None";
 
     //after 4 seconds the second screen is displayed (map and menu)
     setTimeout(() => {
+        //hide initial screen
         divInitialScreen.style.opacity = "0";
         setTimeout(() =>{
+            //show second screen
             divMap.style.display = "block";
             divMenu.style.display = "block";
             setTimeout(() =>{
@@ -873,38 +900,52 @@ function initApp(){
 
 
 
-
-
 function showHiddendivHtmlCoordinates(){
-    //Init
+    //Init-Get HTML elements
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
     var textCoordinates = document.getElementById("coordinates-text");
 
     //Chek there are coordinates
     if(currentPosition.geometry.coordinates.length === 0){
-        //hidden div coordinates
+        //hide coordinates
         divCoordinates.style.opacity = "0";
         textCoordinates.style.opacity = "0";
 
-        //set transform to div menu
+        //set transform
         divMenu.style.transform = "translateY(-18%)";
 
         setTimeout(() =>{
             document.getElementById("coordinates-text").innerHTML = "";
         }, 3000);
-    }else{
-        //show div coordinates
+    }
+    else{
+        //show coordinates
         divCoordinates.style.display = "block";
         divCoordinates.style.opacity = "1";
         textCoordinates.style.opacity = "1";
 
-        //set transform to div menu
+        //set transform
         divMenu.style.transform = "translateY(-50%)";
     }
 }
 
 
+
+
+//Toast, better than alert
+function showToast(message){
+    var toast = document.getElementById("toast");
+
+    //show toast
+    toast.innerHTML = message;
+    toast.style.opacity= "1";
+
+    //hide toast
+    setTimeout(() =>{
+        toast.style.opacity= "0";
+    }, 3000); //3seg
+}
 
 
 
