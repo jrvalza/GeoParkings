@@ -35,7 +35,7 @@ var currentPosition ={
 //positioning options (1.GPS, 2. Wifi, 3.IP Adress)
 var geolocationOptions = {
     enableHighAccuracy: true,//GPS
-    timeout: 10000 //10seg
+    timeout: 1000 //10seg
 }
 
 
@@ -130,7 +130,7 @@ var squareDistanceRef = Math.pow(refDistance, 2);
 //---------------------------------------Initial point for cordova apps---------------------------------------
 //------------------------------------------------------------------------------------------------------------
 //initial point for cordova apps
-//document.addEventListener('deviceready', onDeviceReady, false);
+document.addEventListener('deviceready', onDeviceReady, false);
 function onDeviceReady(){
     //Initial GUI
     initApp();
@@ -193,6 +193,7 @@ function formatCoordinates(){
     //Check there are coordinates
     if (currentPosition.geometry.coordinates[0] == undefined){
         alert("It is necessary to know your position before changing the coordinate format.");
+        //showAlert("It is necessary to know your position before changing the coordinate format.");
         return;
     }
 
@@ -310,8 +311,13 @@ function toggleLocation(){
         showToast("Starting geolocation service.");
         watchID = navigator.geolocation.watchPosition(geolocationSucess, geolocationError, geolocationOptions);
 
+        //Watch the compass sensor
+        //startWatchCompass();
+
         //change color: geolocaton icon
         document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "orange";
+
+        //
     }
     else{
         //Clear memory
@@ -368,11 +374,10 @@ function geolocationSucess(position){
 
 
 //ANSLKNKLSAKLVHNALKSLAKHNLKJAAAAAAAAAAAAAAAAAAAAAAAA
-    console.log("parkingArray: " + parkingArray.length)
-    console.log("nearParkingArray: " + nearParkingArray.length)
-    console.log("leafletPointArray: " + leafletPointArray.length)
-    //Watch the compass sensor
-    //startWatchCompass();
+    console.log("parkingArray: " + parkingArray.length);
+    console.log("nearParkingArray: " + nearParkingArray.length);
+    console.log("leafletPointArray: " + leafletPointArray.length);
+
     //update compass direction
     compassAngle += -20;
 
@@ -436,6 +441,7 @@ function findParkings(){
     //Check status of geolocation
     if (watchID === null){
         alert("It is necessary to know your location before searching for parking spaces.");
+        //showAlert("It is necessary to know your location before searching for parking spaces.");
         return;
     }
 
@@ -723,6 +729,7 @@ function clearMemory(){
 
     //Ask to clear memory
     var clearMemory = confirm("Stop geolocation?");
+
     console.log(clearMemory);
     if (!clearMemory){
         return clearMemory;
@@ -788,7 +795,7 @@ function clearMemory(){
 //-----------------------------------------------Cordova Plugins----------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
-/*
+//------------------------------------Compass cordova------------------------------------
 // Start watching the compass
 function startWatchCompass() {
     if (watchCompassID === null){
@@ -807,7 +814,13 @@ function stopWatchCompass() {
 //Get the current heading
 function onSuccessCompass(heading) {
     //update global variable
-    compassAngle = -45 + heading.magneticHeading;
+    if (watchCompassID !== null) {
+        compassAngle = -45 + heading.magneticHeading;
+        console.log("heading: " + compassAngle)
+    }
+    else{
+        return;
+    }
 }
 
 //Failed to get the heading
@@ -825,7 +838,38 @@ function onErrorCompass(error) {
             break;
     }
 }
-*/
+
+
+
+
+
+
+//-----------------------------------Dialogues cordova-----------------------------------
+function showAlert(message){
+    //cordova-plugin-notification
+    navigator.notification.alert(message,
+                                function (){},//callback anonymous function
+                                "GeoParkings", //title
+                                "Ok"//name of option
+                            );
+}
+function showConfirm(message){
+    //cordova-plugin-notification
+    navigator.notification.confirm(message,
+                                onConfirm,//callback function
+                                "GeoParkings", //title
+                                ["OK","Cancel"]//name of options -> user bottoms. Ok=1, Cancel=2
+                            );
+}
+
+//callback function
+function onConfirm(buttonIndex){
+    if (buttonIndex == 1){
+        console.log("Confirm");
+    }
+}
+
+
 
 
 
@@ -848,6 +892,7 @@ function onClick(marker) {
 function findRoute(){
     //Ask to start navigation
     var startNavigation = confirm("Start navigation?");
+    //showConfirm("Start navigation?");
     if (!startNavigation){
         return;
     }
@@ -933,7 +978,7 @@ function showHiddendivHtmlCoordinates(){
 
 
 
-//Toast, better than alert
+//Toast
 function showToast(message){
     var toast = document.getElementById("toast");
 
