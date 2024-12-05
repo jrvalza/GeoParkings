@@ -12,13 +12,25 @@
 
 //cordova-plugin-device-orientation
 var watchCompassID = null;
-var compassOptions = { frequency: 500 };//1s
+var compassOptions = { frequency: 100 };//0.1s
 
 
 //----------------------------------Geolocation----------------------------------
 
 //null=geolocation disable. not null=geolocation enable
 var watchID = null;
+
+//GeoJSON initial position
+var initialPosition ={
+    "type": "Feature",
+    "geometry": {
+        "type": "Point",
+        "coordinates": []
+    },
+    "properties": {
+        "name": "initial-position",
+    }
+};
 
 //GeoJSON current position
 var currentPosition ={
@@ -30,13 +42,13 @@ var currentPosition ={
     "properties": {
         "name": "current-position",
     }
-}
+};
 
 //positioning options (1.GPS, 2. Wifi, 3.IP Adress)
 var geolocationOptions = {
     enableHighAccuracy: true,//GPS
     timeout: 10000 //10seg of waiting for geolocation
-}
+};
 
 
 //-----------------------------------Parkings------------------------------------
@@ -49,10 +61,12 @@ var parking ={
         "coordinates": []
     },
     "properties": {}
-}
+};
+
 //Time control for periodic GET requests ->apiParkings()
 var getParkingTimeout = null;
 var getParkingInterval = null;
+var showParkingInterval = null;
 
 //save parkings GeoJSON grom GET request
 var parkingArray = [];
@@ -89,7 +103,8 @@ var map = L.map("map", {
 //all base maps options
 var baseMaps = {
     "OpenStreetMap": osm,
-    "Ortofoto PNOA": pnoa};
+    "Ortofoto PNOA": pnoa
+};
 
 var layerControl = L.control.layers(baseMaps).addTo(map);
 
@@ -102,6 +117,15 @@ var leafletParkingsIdArray = [];
 //coordinates of selected parking
 var selectedParkingCoords = [];
 
+//Instantiates a new router with the provided options
+var router = L.Routing.osrmv1({
+    serviceUrl: 'https://router.project-osrm.org/route/v1', // OSRM server
+    timeout: 10000, //10seg
+    profile: "driving",
+});
+
+//route found
+var routeDictionary = {};
 
 
 //-----------------------------default configuration-----------------------------
@@ -112,7 +136,6 @@ var formatCoords = "geo";
 //search distance squared
 var refDistance = 1500;//1.5km
 var squareDistanceRef = Math.pow(refDistance, 2);
-
 
 
 
@@ -161,7 +184,7 @@ function toggleLocation(){
         watchID = navigator.geolocation.watchPosition(geolocationSucess, geolocationError, geolocationOptions);
 
         //Watch the compass sensor
-        startWatchCompass();
+        //startWatchCompass();
 
         //change color: geolocaton icon
         document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "orange";
@@ -169,16 +192,18 @@ function toggleLocation(){
         //
     }
     else{
+
         //Clear memory
-        /*var response = clearMemory();
+        var response = clearMemory();
         if (!response){
             return;
-        };*/
+        };
 
-        var response = clearMemory();
+        //cordova
+        /*var response = clearMemory();
         if (response === 2){//cancel
             return;
-        };
+        };*/
 
 
         //Stop Geolocation
@@ -187,19 +212,7 @@ function toggleLocation(){
         watchID=null;
 
         //Stop the compass sensor
-        stopWatchCompass();
-
-        //---------------Stop making GET requests---------------
-
-        // Clear timeout and interval
-        if (getParkingTimeout !== null) {
-            clearTimeout(getParkingTimeout);
-            getParkingTimeout = null;
-        }
-        if (getParkingInterval !== null) {
-            clearInterval(getParkingInterval);
-            getParkingInterval = null;
-        }
+        //stopWatchCompass();
     }
 }
 
@@ -212,18 +225,23 @@ function geolocationSucess(position){
     currentPosition.properties.accuracy = position.coords.accuracy;
     currentPosition.properties.timestamp = position.timestamp;
 
-    //change color: geolocaton icon
-    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
+    //fill a global var initialPosition (geojson)
+    if (initialPosition.geometry.coordinates.length === 0){
+        initialPosition.geometry.coordinates = [position.coords.longitude, position.coords.latitude];
+    }
 
-    //display coordinates
-    console.log(JSON.stringify(currentPosition, null, 4));
+    //Borrar al pasar a cordova
+    compassAngle = -45
+    drawCurrentPosition(compassAngle);
+
+    //show coordinates bar
     formatCoordinates();
     showHiddendivHtmlCoordinates();
 
-    //show neaby parkings in map
-	drawParking();
-
     //zoom to existing map elements
+
+    //change color: geolocaton icon
+    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
 }
 
 
@@ -237,25 +255,45 @@ function geolocationError(error){
     //error case evaluation
     switch(error.code){
         case error.PERMISSION_DENIED:
-            showToast("geolocation request denied.");
+            showToast("Geolocation request denied.");
             break;
         case error.POSITION_UNAVAILABLE:
-            showToast("position unavailable.");
+            showToast("Position unavailable.");
             break;
         case error.TIMEOUT:
-            showToast("geolocation request timed out.");
+            showToast("Geolocation request timed out.");
             break;
         case error.UNKNOWN_ERROR:
-            showToast("unknown geolocation error.");
+            showToast("Unknown geolocation error.");
             break;
     }
 }
 
 
 
+//distance calculation between our position at instant t and t+1
+function distanceChangePosition(){
 
+    //check there are coordinates
+    if (initialPosition.geometry.coordinates.length === 0 & currentPosition.geometry.coordinates.length === 0){
+        return;
+    }
 
+    //UTM coordinates initial position
+    var utmInitialPosition = geoToUTM(initialPosition.geometry.coordinates)[0];//[x,y]
+    var XutmInitialPosition = utmInitialPosition[0];
+    var YutmInitialPosition = utmInitialPosition[1];
 
+    //UTM coordinates current position
+    var utmCurrentPosition = geoToUTM(currentPosition.geometry.coordinates)[0];//[x,y]
+    var XutmCurrentPosition = utmCurrentPosition[0];
+    var YutmCurrentPosition = utmCurrentPosition[1];
+
+    //distance calculation
+    var squareDistance = Math.pow(XutmInitialPosition - XutmCurrentPosition, 2) + Math.pow(YutmInitialPosition - YutmCurrentPosition, 2);
+
+    return squareDistance;
+}
 
 
 
@@ -279,8 +317,10 @@ function findParkings(){
 
     //Check status of geolocation
     if (watchID === null){
-        //alert("It is necessary to know your location before searching for parking spaces.");
-        showAlert("It is necessary to know your location before searching for parking spaces.");
+        alert("It is necessary to know your location before searching for parking spaces.");
+
+        //cordova
+        //showAlert("It is necessary to know your location before searching for parking spaces.");
         return;
     }
 
@@ -298,21 +338,18 @@ function findParkings(){
     const nextHour = new Date(now.getTime());
     nextHour.setUTCHours(now.getUTCHours() + 1, 1, 0, 0);
     const timeUntilNextRequest = nextHour - now;
-    //console.log("primera ejecución");
 
     //GET requests every hour and one minute
     getParkingTimeout = setTimeout(() => {
 
         //request GET --> apiParkings
         getParkings();
-        //console.log("siguiente ejecución.")
 
         //GET request update interval
         getParkingInterval = setInterval(() => {
 
             //request GET --> apiParkings
             getParkings();
-            //console.log("ejecución cada hora y 1 minuto");
         }, 60*60*1000); // 60 minutes * 60 seconds * 1000 ms
 
     }, timeUntilNextRequest);
@@ -346,7 +383,6 @@ function getParkings() {
 
 			//convert text to Object JSON
 			jsonObjectParkings = JSON.parse(jsonText);
-            //console.log(JSON.stringify(jsonObjectParkings.results[0], null, 4));
 
             //extracting parking information
             for (var count=0; count < jsonObjectParkings.results.length; count++){
@@ -363,6 +399,9 @@ function getParkings() {
             }
         }
     }
+    //show nearby parking lots
+    showParkingInterval = setInterval(drawParking, 2000);//2seg
+
 }
 
 
@@ -473,9 +512,20 @@ function getCustomParkingIcon(point) {
 }
 
 
+
 //------show nerby parkings------
 function drawParking(){
 
+    //show nearby parking lots on the map only when our position changes by 50 m from the previous one
+    var distance = distanceChangePosition();
+
+    /*if (distance === 1){//cambiar la condicion a (distance <= 2500) cuando estemos en cordova
+        return;
+    }
+
+    //update initial position coordinates
+    initialPosition.geometry.coordinates = currentPosition.geometry.coordinates;
+    */
     //Clear map leaflet each new user position
     if (leafletParkingsIdArray.length !== 0){
         for (var count = 0; count < leafletParkingsIdArray.length; count++){
@@ -490,7 +540,7 @@ function drawParking(){
 
     //check there are points
     if (nearParkingArray.length === 0){
-        //showToast("There are no nearby parking facilities");
+        //showToast("There are no nearby parking facilities.");
         document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
         return;
     }
@@ -565,20 +615,32 @@ function drawCurrentPosition(compassAngle){
 function clearMemory(){
 
     //Ask to clear memory
-    /*var clearMemory = confirm("Stop geolocation?");
-
-    console.log(clearMemory);
+    var clearMemory = confirm("Stop geolocation?");
     if (!clearMemory){
         return clearMemory;
-    }*/
-    var buttonIndex = onConfirm("Stop geolocation?");
+    }
+
+    //Cordova
+    //Ask to clear memory
+    /*var buttonIndex = onConfirm("Stop geolocation?");
 
     if (buttonIndex === 2){//cancel clear memory
         return buttonIndex;
-    }
+    }*/
 
     //Clear memory
     parkingArray = [];
+
+    initialPosition ={
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": []
+        },
+        "properties": {
+            "name": "initial-position",
+        }
+    };
 
     currentPosition ={
         "type": "Feature",
@@ -589,7 +651,7 @@ function clearMemory(){
         "properties": {
             "name": "current-position",
         }
-    }
+    };
 
     parking ={
         "type": "Feature",
@@ -598,7 +660,7 @@ function clearMemory(){
             "coordinates": []
         },
         "properties": {}
-    }
+    };
 
     //Clear map leaflet
     //remove parkings
@@ -618,8 +680,25 @@ function clearMemory(){
     document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
 
-    //return clearMemory;
-    return buttonIndex;
+    // Clear timeout and interval
+    if (getParkingTimeout !== null) {
+        clearTimeout(getParkingTimeout);
+        getParkingTimeout = null;
+    }
+    if (getParkingInterval !== null) {
+        clearInterval(getParkingInterval);
+        getParkingInterval = null;
+    }
+    if (showParkingInterval !== null) {
+        clearInterval(showParkingInterval);
+        showParkingInterval = null;
+    }
+
+    //Routing
+    routeDictionary = {};
+
+    return clearMemory;
+    //return buttonIndex;
 }
 
 
@@ -695,10 +774,10 @@ function onErrorCompass(error) {
     //error case evaluation
     switch(error.code){
         case error.COMPASS_INTERNAL_ERR:
-            showToast("compass request denied..");
+            showToast("Compass request denied.");
             break;
         case error.COMPASS_NOT_SUPPORTED:
-            showToast("compass not supported.");
+            showToast("Compass not supported.");
             break;
     }
 }
@@ -734,7 +813,7 @@ function onConfirm(buttonIndex){
     //}
 }
 
-
+/**/
 
 
 
@@ -754,17 +833,95 @@ function onClick(marker) {
 }
 
 
-function findRoute(){
-    //Ask to start navigation
-    //var startNavigation = confirm("Start navigation?");
-    showConfirm("Start navigation?");
-    if (!startNavigation){
+
+
+
+
+
+function findRoute() {
+    //Ask if you want to start searching for a route
+    var startNavigation = confirm("Do you want to find a route to the selected parking lot?");
+    if (!startNavigation) {
         return;
     }
-    //----------------------Start navigation----------------------
-    showToast("Starting navigation service.");
-    console.log(selectedParkingCoords);
+
+    //Check there are coordinates
+    if (currentPosition.geometry.coordinates.length === 0 || selectedParkingCoords.length === 0) {
+        showToast("It was not possible to obtain a route.");
+        return;
+    }
+
+    showToast("Looking for an optimal route.");
+
+    //Waypoints
+    var startCoords = currentPosition.geometry.coordinates.toReversed(); // [lat, lng]
+    var endCoords = selectedParkingCoords; // [lat, lng]
+
+    //GET request for a route with the OSRM router
+    router.route(
+        waypoints = [
+            L.Routing.waypoint(L.latLng(startCoords[0], startCoords[1])),
+            L.Routing.waypoint(L.latLng(endCoords[0], endCoords[1]))
+        ],
+        callback = function (err, routes) {
+            if (err) {
+                console.error("Error when searching for the route:", err);
+                return;
+            }
+            //Route found
+            var routeObject = routes[0];
+
+            //Process the route after obtaining it
+            processRoute(routeObject);
+        }
+    );
 }
+
+
+function processRoute(routeObject){
+
+    //Check that a route exists
+    if (routeObject === null){
+        showToast("It was not possible to obtain a route.");
+        return;
+    }
+
+    //Get data
+    var routeCoordinates = routeObject.coordinates;
+    var routeInstructions = routeObject.instructions;
+    var routeSummary = routeObject.summary;
+
+    //Get route vertices with instructions.
+    for (var count = 1; count < routeInstructions.length; count++){
+
+        //start and end indexes
+        var start = routeInstructions[count-1].index;
+        var end = routeInstructions[count].index;
+
+        //get segment coordinates [[lat, lng]]
+        var segmentCoordsArray = routeCoordinates.slice(start, end).map(coord => [coord.lat, coord.lng]);
+
+        //get instruction and add the corresponding coordinates
+        var instruction = routeInstructions[count-1];
+        instruction.coords = segmentCoordsArray;
+
+        //update global varieble
+        routeDictionary[count-1] = instruction;
+    }
+
+    //end instruction
+    var start = routeInstructions[routeInstructions.length-2].index;
+    var end = routeInstructions[routeInstructions.length-1].index;
+    var segmentCoordsArray = routeCoordinates.slice(start, end).map(coord => [coord.lat, coord.lng]);
+    var instruction = routeInstructions[routeInstructions.length-1];
+    instruction.coords = segmentCoordsArray;
+
+    //update global varieble
+    routeDictionary[routeInstructions.length-1] = instruction;
+    //console.log(JSON.stringify(routeDictionary, undefined, 4));
+}
+
+
 
 
 
