@@ -10,7 +10,7 @@
 
 //--------------------------------Cordova Plugins--------------------------------
 
-//cordova-plugin-device-orientation
+//Cordova-plugin-device-orientation
 var watchCompassID = null;
 var compassOptions = { frequency: 100 };//0.1s
 
@@ -44,11 +44,12 @@ var currentPosition ={
     }
 };
 
-//positioning options (1.GPS, 2. Wifi, 3.IP Adress)
+//Positioning options (1.GPS, 2. Wifi, 3.IP Adress)
 var geolocationOptions = {
     enableHighAccuracy: true,//GPS
     timeout: 10000 //10seg of waiting for geolocation
 };
+
 
 
 //-----------------------------------Parkings------------------------------------
@@ -68,7 +69,7 @@ var getParkingTimeout = null;
 var getParkingInterval = null;
 var showParkingInterval = null;
 
-//save parkings GeoJSON grom GET request
+//Save parkings GeoJSON grom GET request
 var parkingArray = [];
 
 
@@ -100,7 +101,7 @@ var map = L.map("map", {
     layers: [osm]
 });
 
-//all base maps options
+//All base maps options
 var baseMaps = {
     "OpenStreetMap": osm,
     "Ortofoto PNOA": pnoa
@@ -108,14 +109,16 @@ var baseMaps = {
 
 var layerControl = L.control.layers(baseMaps).addTo(map);
 
-//save leaflet IDs of entities
+//Save leaflet IDs of entities
 var leafletCurrentPositionId = null;
 var leafletParkingsIdArray = [];
+var leafletRouteId = null;
 
 
 //-----------------------------------Navigation----------------------------------
-//coordinates of selected parking
-var selectedParkingCoords = [];
+
+//Selected parking leaflet object
+var selectedParkingObject = null;
 
 //Instantiates a new router with the provided options
 var router = L.Routing.osrmv1({
@@ -124,16 +127,27 @@ var router = L.Routing.osrmv1({
     profile: "driving",
 });
 
-//route found
+//Route found
 var routeDictionary = {};
 
+//DrawRoute options
+var drawRouteOptions = {
+    color: 'blue',
+    weight: 8,
+    opacity: 0.3,
+    lineCap: 'round',
+    lineJoin: 'round',
+};
 
-//-----------------------------default configuration-----------------------------
 
-//format coordinates: geographic coordinates
+
+
+//-----------------------------Default configuration-----------------------------
+
+//Format coordinates: geographic coordinates
 var formatCoords = "geo";
 
-//search distance squared
+//Search distance squared
 var refDistance = 1500;//1.5km
 var squareDistanceRef = Math.pow(refDistance, 2);
 
@@ -151,18 +165,20 @@ var squareDistanceRef = Math.pow(refDistance, 2);
 //------------------------------------------------------------------------------------------------------------
 //---------------------------------------Initial point for cordova apps---------------------------------------
 //------------------------------------------------------------------------------------------------------------
-//initial point for cordova apps
+
+//Initial point for cordova apps
 document.addEventListener('deviceready', onDeviceReady, false);
 function onDeviceReady(){
+
     //Initial GUI
     initApp();
-    showHiddendivHtmlCoordinates();
 
     //Click events
     document.getElementById("coordinates").addEventListener("click", currentFormatCoordinates);
     document.getElementsByClassName("fa-solid fa-location-dot")[0].addEventListener("click", toggleLocation);
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].addEventListener("click", findParkings);
-    //document.getElementsByClassName("fa-solid fa-layer-group")[0].addEventListener("click", switchBaseMap);
+    document.getElementsByClassName("fa-solid fa-route")[0].addEventListener("click", startNavigation);
+    //document.getElementsByClassName("fa-solid fa-layer-group")[0].addEventListener("click", drawRoute);
 }
 
 
@@ -179,17 +195,15 @@ function toggleLocation(){
     //Check status of geolocation (null=geolocation disable. not null=geolocation enable)
     if (watchID === null){
 
+        //Change color: geolocaton icon
+        document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "orange";
+
         //Start Geolocation
         showToast("Starting geolocation service.");
         watchID = navigator.geolocation.watchPosition(geolocationSucess, geolocationError, geolocationOptions);
 
         //Watch the compass sensor
-        //startWatchCompass();
-
-        //change color: geolocaton icon
-        document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "orange";
-
-        //
+        //watchCompassID = navigator.compass.watchHeading(onSuccessCompass, onErrorCompass, compassOptions);
     }
     else{
 
@@ -212,47 +226,62 @@ function toggleLocation(){
         watchID=null;
 
         //Stop the compass sensor
-        //stopWatchCompass();
+        //navigator.compass.clearWatch(watchCompassID);
+        //watchCompassID = null;
     }
 }
 
 
+var a = 0;//BORRAR AL PASAR A CORDOVA
 //Geolocation success
 function geolocationSucess(position){
 
-    //fill a global var currentPosition (geojson)
-    currentPosition.geometry.coordinates = [position.coords.longitude, position.coords.latitude];
+    //PRUEBA---------BORRAR AL PASAR A CORDOVA
+    a +=0.001;
+    var dlat = -2*a;
+    var dlon = -a
+
+    //Change color: geolocaton icon
+    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
+
+    //Fill a global var currentPosition (geojson)
+    currentPosition.geometry.coordinates = [position.coords.longitude + dlon, position.coords.latitude + dlat];
     currentPosition.properties.accuracy = position.coords.accuracy;
     currentPosition.properties.timestamp = position.timestamp;
 
-    //fill a global var initialPosition (geojson)
+    //Fill a global var initialPosition (geojson)
     if (initialPosition.geometry.coordinates.length === 0){
-        initialPosition.geometry.coordinates = [position.coords.longitude, position.coords.latitude];
+        initialPosition.geometry.coordinates = [currentPosition.geometry.coordinates[0], currentPosition.geometry.coordinates[1]];//[lng, lat]
     }
 
-    //Borrar al pasar a cordova
-    compassAngle = -45
-    drawCurrentPosition(compassAngle);
+    //PRUEBA-------------BORRAR AL PASAR A CORDOVA
+    if (leafletCurrentPositionId === null && currentPosition.geometry.coordinates.length !==0){
+        compassAngle = -45
+        drawCurrentPosition(compassAngle);
+    }
 
-    //show coordinates bar
-    formatCoordinates();
-    showHiddendivHtmlCoordinates();
+    //Update the coordinates of our position marker
+    if (leafletCurrentPositionId !== null){
+        var newLatLng = L.latLng(currentPosition.geometry.coordinates[1], currentPosition.geometry.coordinates[0]);//[lat,lng]
+        leafletCurrentPositionId.setLatLng(newLatLng);
 
-    //zoom to existing map elements
+        //Show/Hide HTML elements
+        formatCoordinates();
+        showHideElements();
+    }
 
-    //change color: geolocaton icon
-    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
+    //Zoom to existing map elements
 }
 
 
 //Geolocation error
 function geolocationError(error){
 
-    //reset default values
+    //Reset default values
     watchID=null;
     document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
 
-    //error case evaluation
+    //Error case evaluation
     switch(error.code){
         case error.PERMISSION_DENIED:
             showToast("Geolocation request denied.");
@@ -271,29 +300,7 @@ function geolocationError(error){
 
 
 
-//distance calculation between our position at instant t and t+1
-function distanceChangePosition(){
 
-    //check there are coordinates
-    if (initialPosition.geometry.coordinates.length === 0 & currentPosition.geometry.coordinates.length === 0){
-        return;
-    }
-
-    //UTM coordinates initial position
-    var utmInitialPosition = geoToUTM(initialPosition.geometry.coordinates)[0];//[x,y]
-    var XutmInitialPosition = utmInitialPosition[0];
-    var YutmInitialPosition = utmInitialPosition[1];
-
-    //UTM coordinates current position
-    var utmCurrentPosition = geoToUTM(currentPosition.geometry.coordinates)[0];//[x,y]
-    var XutmCurrentPosition = utmCurrentPosition[0];
-    var YutmCurrentPosition = utmCurrentPosition[1];
-
-    //distance calculation
-    var squareDistance = Math.pow(XutmInitialPosition - XutmCurrentPosition, 2) + Math.pow(YutmInitialPosition - YutmCurrentPosition, 2);
-
-    return squareDistance;
-}
 
 
 
@@ -313,6 +320,7 @@ function distanceChangePosition(){
 //--------------------------------------------------Parkings--------------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
+//Initial request for parking spaces to the API of the city of Valencia
 function findParkings(){
 
     //Check status of geolocation
@@ -324,17 +332,17 @@ function findParkings(){
         return;
     }
 
-    //change search icon color
+    //Change search icon color
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "orange";
 
-    //initial request GET --> apiParkings
+    //Initial request GET --> apiParkings
     getParkings();
 
-    //---------------following GET requests-->apiParkings---------------
-    //geolocation start time
+    //---------------Following GET requests-->apiParkings---------------
+    //Geolocation start time
     const now = new Date();
 
-    //time remaining to the nearest hour and minute in miliseconds
+    //Time remaining to the nearest hour and minute in miliseconds
     const nextHour = new Date(now.getTime());
     nextHour.setUTCHours(now.getUTCHours() + 1, 1, 0, 0);
     const timeUntilNextRequest = nextHour - now;
@@ -342,13 +350,13 @@ function findParkings(){
     //GET requests every hour and one minute
     getParkingTimeout = setTimeout(() => {
 
-        //request GET --> apiParkings
+        //Request GET --> apiParkings
         getParkings();
 
         //GET request update interval
         getParkingInterval = setInterval(() => {
 
-            //request GET --> apiParkings
+            //Request GET --> apiParkings
             getParkings();
         }, 60*60*1000); // 60 minutes * 60 seconds * 1000 ms
 
@@ -358,12 +366,13 @@ function findParkings(){
 
 //GET request for parkings dataset
 function getParkings() {
+
     showToast("Looking for parking spaces in your area.");
 
-    //clear global variable
+    //Clear global variable
     parkingArray = [];
 
-	//url of the API of public parking lots in the city of Valencia
+	//Url of the API of public parking lots in the city of Valencia
 	var url = "https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets/parkings/records?limit=25";
 
 	// Pattern to send GET requests
@@ -371,7 +380,7 @@ function getParkings() {
 	var xhr = new XMLHttpRequest();
 
 	//2.Open and send requests
-    // Parameter 1: HTTP verb, Parameter 2: URL, Parameter 3: true=ansynchronous, false=synchronous
+    //Parameter 1: HTTP verb, Parameter 2: URL, Parameter 3: true=ansynchronous, false=synchronous
 	xhr.open("GET", url, true);
 	xhr.send();
 
@@ -381,12 +390,13 @@ function getParkings() {
             //JSON in text format
 			var jsonText = xhr.responseText;
 
-			//convert text to Object JSON
+			//Convert text to object JSON
 			jsonObjectParkings = JSON.parse(jsonText);
 
-            //extracting parking information
+            //Extracting parkings information
             for (var count=0; count < jsonObjectParkings.results.length; count++){
-                //info
+
+                //Info
                 object = jsonObjectParkings.results[count];
                 parking.geometry.coordinates = object.geo_shape.geometry.coordinates;
                 parking.properties.name = object.nombre;
@@ -394,21 +404,23 @@ function getParkings() {
                 parking.properties.free_parking = object.plazaslibr;
                 parking.properties.last_update = object.ultima_mod;
 
-                //save parking
+                //Save parking
                 parkingArray.push(JSON.parse(JSON.stringify(parking)));
+            }
+            //Show nearby parking lots - update each 2s
+            if (showParkingInterval === null){
+                showParkingInterval = setInterval(drawParking, 2000);//2seg
             }
         }
     }
-    //show nearby parking lots
-    showParkingInterval = setInterval(drawParking, 2000);//2seg
-
 }
 
 
 
 
-//obtaining the nearest parking spaces at each new position our
+//Obtaining the nearest parking spaces at each new position our
 function nearParking(){
+
     //init
     var  nearParkingArray = [];
 
@@ -417,19 +429,13 @@ function nearParking(){
         return nearParkingArray;
     }
 
-    //UTM coordinates
-    var utmCurrentPosition = geoToUTM(currentPosition.geometry.coordinates)[0];//[x,y]
-    var XutmCurrentPosition = utmCurrentPosition[0];
-    var YutmCurrentPosition = utmCurrentPosition[1];
+    //Distance calculation
+    parkingArray.forEach((parkingJSON) => {//parkingJSON.geometry.coordinates = [lng, lat]
 
-    //distance calculation
-    parkingArray.forEach((parkingJSON) => {
-        var utmParking = geoToUTM(parkingJSON.geometry.coordinates)[0];//[x,y]
-        var XutmParking = utmParking[0];
-        var YutmParking = utmParking[1];
-        var squareDistance = Math.pow(XutmCurrentPosition - XutmParking, 2) + Math.pow(YutmCurrentPosition - YutmParking, 2);
+        //Calculate distance between current position and parkings
+        var squareDistance = calculateDistance(parkingJSON.geometry.coordinates, currentPosition.geometry.coordinates)
 
-        //nearby?
+        //Nearby?
         if (squareDistance < squareDistanceRef) {
             nearParkingArray.push(parkingJSON);
         }
@@ -451,13 +457,15 @@ function nearParking(){
 //------------------------------------------------------------------------------------------------------------
 
 //------Icons------
+
 function getCustomCurrentPositionIcon(angle) {
+
     //Icon
     var currentPositionIcon = L.divIcon({
         html: `<i class="fa-solid fa-location-arrow" style="transform: rotate(${angle}deg); -ms-transform: rotate(${angle}deg); -webkit-transform: rotate(${angle}deg)"></i>`,
         className: 'currentPosition-icon',
         iconSize: [30, 30],
-        iconAnchor: [15, 15], // central point
+        iconAnchor: [15, 15], //central point
     });
 
     //Popup
@@ -476,6 +484,7 @@ function getCustomCurrentPositionIcon(angle) {
 
 
 function getCustomParkingIcon(point) {
+
     //Icon
     var color;
     if (point.properties.free_parking == 0) {//busy
@@ -505,7 +514,7 @@ function getCustomParkingIcon(point) {
     popup += "<tr><th>Plazas libres</th><td>" + point.properties.free_parking + "</td></tr>";
     popup += "<tr><th>Fecha</th><td>" + point.properties.last_update + "</td></tr>";
     popup += "</table><br/>";
-    popup +="<div class='btn'><button type='button' class='btn_navigation' onclick='findRoute()'>go to the parking?</button></div>";
+    popup +="<div class='btn'><button type='button' class='btn_navigation' onclick='onlySelectedParkingOnMap()'>Get a route to parking?</button></div>";
     popup += "</div>";
 
     return [popup, parkingIcon];
@@ -513,40 +522,48 @@ function getCustomParkingIcon(point) {
 
 
 
-//------show nerby parkings------
+//------Show nerby parkings------
 function drawParking(){
 
-    //show nearby parking lots on the map only when our position changes by 50 m from the previous one
-    var distance = distanceChangePosition();
+    //Check there are parkings on map
+    if (leafletParkingsIdArray.length !== 0){
 
-    /*if (distance === 1){//cambiar la condicion a (distance <= 2500) cuando estemos en cordova
-        return;
+        //Distance calculation between our position at instant t and t+1
+        var distance = calculateDistance(initialPosition.geometry.coordinates, currentPosition.geometry.coordinates);
+
+        //Update nearby parking lots on the map only when our position changes by 50 m from the previous one
+        if (distance <= 2500){
+            return;
+        }
     }
 
-    //update initial position coordinates
+    //Update initial position coordinates
     initialPosition.geometry.coordinates = currentPosition.geometry.coordinates;
-    */
+
     //Clear map leaflet each new user position
     if (leafletParkingsIdArray.length !== 0){
         for (var count = 0; count < leafletParkingsIdArray.length; count++){
             map.removeLayer(leafletParkingsIdArray[count]);
         };
     }
-    //reset global variable value
+
+    //Reset global variable value
     leafletParkingsIdArray = [];
 
-    //------get nearby parkings------
+    //------Get nearby parkings------
     var nearParkingArray = nearParking();
 
-    //check there are points
+    //Check there are points
     if (nearParkingArray.length === 0){
+
+        //REVISAR ESTA TOSTADA PARA QUE SOLO SE MUESTRE EN CASO DE NO TENER PARKINGS CERCANOS
         //showToast("There are no nearby parking facilities.");
         document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
         return;
     }
-    //draw points
+    //Draw points
     nearParkingArray.forEach((parking) => {
-        //popup and style icon
+        //Popup and style icon
         var customIcon = getCustomParkingIcon(parking);
         var popup =customIcon[0];
         var icon = customIcon[1];
@@ -561,25 +578,25 @@ function drawParking(){
         leafletPointID.bindPopup(popup);
 
         //Click event
-        leafletPointID.on('click', onClick);
+        leafletPointID.on('click', onClickParking);
 
         //Add point to map
         leafletPointID.addTo(map);
 
-        //add pointID to leafletParkingsIdArray
+        //Add pointID to leafletParkingsIdArray
         leafletParkingsIdArray.push(leafletPointID);
     })
 
-    //change search icon color
+    //Change search icon color
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "cyan";
 }
 
 
 
-//------show current position------
+//------Show current position------
 function drawCurrentPosition(compassAngle){
 
-    //popup and style icon
+    //Popup and style icon
     var customIcon = getCustomCurrentPositionIcon(compassAngle);
     var popup = customIcon[0];
     var icon = customIcon[1];
@@ -593,13 +610,11 @@ function drawCurrentPosition(compassAngle){
     //Link popup
     leafletCurrentPositionId.bindPopup(popup);
 
-    //Click event
-    leafletCurrentPositionId.on('click', onClick);
-
     //Add point to map
     leafletCurrentPositionId.addTo(map);
 
-    //zoom to current position
+    //REVISAR ANTES DE ENTREGA FINAL
+    //Zoom to current position
     map.setView(currentPosition.geometry.coordinates.toReversed(), 14);
 }
 
@@ -662,25 +677,30 @@ function clearMemory(){
         "properties": {}
     };
 
-    //Clear map leaflet
-    //remove parkings
+    //--------------Clear map leaflet--------------
+    //Remove all parkings
     for (var count = 0; count < leafletParkingsIdArray.length; count++){
         map.removeLayer(leafletParkingsIdArray[count]);
     }
     leafletParkingsIdArray = [];
 
-    //remove current position
+    //Remove the current position
     map.removeLayer(leafletCurrentPositionId);
     leafletCurrentPositionId = null;
 
-    //hide coordinates
-    showHiddendivHtmlCoordinates()
+    //Remove route
+    if (leafletRouteId !== null) {
+        map.removeLayer(leafletRouteId);
+        leafletRouteId = null;
+    }
 
-    //change icon color
-    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
-    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+    //--------------Routing--------------
+    selectedParkingObject = null;
+    routeDictionary = {};
 
-    // Clear timeout and interval
+
+
+    //--------------Clear timeout and intervals--------------
     if (getParkingTimeout !== null) {
         clearTimeout(getParkingTimeout);
         getParkingTimeout = null;
@@ -694,8 +714,12 @@ function clearMemory(){
         showParkingInterval = null;
     }
 
-    //Routing
-    routeDictionary = {};
+    //Show/Hide HTML elements
+    showHideElements();
+
+    //Change icon color
+    document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
+    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
 
     return clearMemory;
     //return buttonIndex;
@@ -727,25 +751,20 @@ function clearMemory(){
 //------------------------------------------------------------------------------------------------------------
 
 //------------------------------------Compass cordova------------------------------------
-// Start watching the compass
-function startWatchCompass() {
-    if (watchCompassID === null){
-        watchCompassID = navigator.compass.watchHeading(onSuccessCompass, onErrorCompass, compassOptions);
-    }
-}
-
 
 //Get the current heading
 function onSuccessCompass(heading) {
-    //compass value
+
+    //Compass value
     var compassAngle = -45 + heading.magneticHeading;
 
-    //drawing for the first time our position
-    if (leafletCurrentPositionId === null & currentPosition.geometry.coordinates.length !==0){
+    //Drawing for the first time our position
+    if (leafletCurrentPositionId === null && currentPosition.geometry.coordinates.length !==0){
         drawCurrentPosition(compassAngle);
     }
     else if (leafletCurrentPositionId){
-        //update the icon orientation
+
+        //Update the icon orientation of the current position
         var customIcon = getCustomCurrentPositionIcon(compassAngle);
         icon = customIcon[1];
         leafletCurrentPositionId.setIcon(icon);
@@ -753,25 +772,13 @@ function onSuccessCompass(heading) {
 }
 
 
-//Stop watching the compass
-function stopWatchCompass() {
-    if (watchCompassID) {
-        // clean compass
-        navigator.compass.clearWatch(watchCompassID);
-
-        //reset global variables
-        watchCompassID = null;
-    }
-}
-
-
-
 //Failed to get the heading
 function onErrorCompass(error) {
-    //reset default value
+
+    //Reset default value
     watchCompassID=null;
 
-    //error case evaluation
+    //Error case evaluation
     switch(error.code){
         case error.COMPASS_INTERNAL_ERR:
             showToast("Compass request denied.");
@@ -789,7 +796,7 @@ function onErrorCompass(error) {
 
 //-----------------------------------Dialogues cordova-----------------------------------
 function showAlert(message){
-    //cordova-plugin-notification
+    //Cordova-plugin-notification
     navigator.notification.alert(message,
                                 function (){},//callback anonymous function
                                 "GeoParkings", //title
@@ -797,7 +804,7 @@ function showAlert(message){
                             );
 }
 function showConfirm(message){
-    //cordova-plugin-notification
+    //Cordova-plugin-notification
     navigator.notification.confirm(message,
                                 onConfirm,//callback function
                                 "GeoParkings", //title
@@ -805,7 +812,7 @@ function showConfirm(message){
                             );
 }
 
-//callback function
+//Callback function to confirm a user action
 function onConfirm(buttonIndex){
     return buttonIndex;
     //if (buttonIndex == 1){
@@ -813,7 +820,7 @@ function onConfirm(buttonIndex){
     //}
 }
 
-/**/
+
 
 
 
@@ -825,11 +832,60 @@ function onConfirm(buttonIndex){
 //-------------------------------------------------Navigation-------------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
-function onClick(marker) {
-    // get coordinate of selected parking
-    var latlon = marker.latlng;
-    //update global variables
-    selectedParkingCoords = [latlon.lat, latlon.lng];
+//Capture of the coordinates of the selected parking lot
+function onClickParking(marker) {
+
+    //Update global variables
+    selectedParkingObject = marker;
+}
+
+
+
+
+function onlySelectedParkingOnMap(){
+
+    //Ask if you want to start searching for a route
+    var searchRoute = confirm("Do you want to find a route to the selected parking lot?");
+    if (!searchRoute) {
+        return;
+    }
+
+    /*//Cordova
+    //Ask to find a route
+    var searchRoute = onConfirm("Do you want to find a route to the selected parking lot?");
+    if (searchRoute === 2){//Cancel
+        return
+    }*/
+
+    //Check that the leaflet object has been obtained from the selected parking lot.
+    if (selectedParkingObject === null && leafletParkingsIdArray.length === 0){
+        showToast("It was not possible to obtain a route.");
+        return;
+    }
+
+    //Stop drawing parkings
+    if (showParkingInterval !== null) {
+        clearInterval(showParkingInterval);
+        showParkingInterval = null;
+    }
+
+    //Show on map only parking selected and current position
+    var idSelectedParking = selectedParkingObject.sourceTarget._leaflet_id;
+
+    //Remove all unselected parking lots from the map
+    leafletParkingsIdArray = leafletParkingsIdArray.filter(parking => {
+        if (parking._leaflet_id !== idSelectedParking) {
+            map.removeLayer(parking);
+            return false; //exclusion from the leafletParkingsIdArray
+        }
+        return true;//keep on the leafletParkingsIdArray
+    });
+
+    //Get coordinates of selected parking
+    var selectedParkingCoords = [selectedParkingObject.latlng.lat, selectedParkingObject.latlng.lng];
+
+    //Find a optimal route
+    findRoute(selectedParkingCoords);
 }
 
 
@@ -837,13 +893,8 @@ function onClick(marker) {
 
 
 
-
-function findRoute() {
-    //Ask if you want to start searching for a route
-    var startNavigation = confirm("Do you want to find a route to the selected parking lot?");
-    if (!startNavigation) {
-        return;
-    }
+//GET request for a route with the OSRM router
+function findRoute(selectedParkingCoords) {
 
     //Check there are coordinates
     if (currentPosition.geometry.coordinates.length === 0 || selectedParkingCoords.length === 0) {
@@ -863,9 +914,11 @@ function findRoute() {
             L.Routing.waypoint(L.latLng(startCoords[0], startCoords[1])),
             L.Routing.waypoint(L.latLng(endCoords[0], endCoords[1]))
         ],
-        callback = function (err, routes) {
-            if (err) {
-                console.error("Error when searching for the route:", err);
+        callback = function (error, routes) {
+
+            //In case of error in the GET request
+            if (error) {
+                showToast("Error when searching for the route: " + error);
                 return;
             }
             //Route found
@@ -878,6 +931,7 @@ function findRoute() {
 }
 
 
+//Organizing route information in the form of a dictionary
 function processRoute(routeObject){
 
     //Check that a route exists
@@ -891,38 +945,112 @@ function processRoute(routeObject){
     var routeInstructions = routeObject.instructions;
     var routeSummary = routeObject.summary;
 
-    //Get route vertices with instructions.
+    //Get route vertices with instructions
     for (var count = 1; count < routeInstructions.length; count++){
 
-        //start and end indexes
+        //Start and end indexes
         var start = routeInstructions[count-1].index;
         var end = routeInstructions[count].index;
 
-        //get segment coordinates [[lat, lng]]
+        //Get segment coordinates [[lat, lng], ... ,[lat_n, lng_n]]
         var segmentCoordsArray = routeCoordinates.slice(start, end).map(coord => [coord.lat, coord.lng]);
 
-        //get instruction and add the corresponding coordinates
+        //Get instruction and add the corresponding coordinates
         var instruction = routeInstructions[count-1];
         instruction.coords = segmentCoordsArray;
 
-        //update global varieble
+        //Update global variable
         routeDictionary[count-1] = instruction;
     }
 
-    //end instruction
+    //End instruction
     var start = routeInstructions[routeInstructions.length-2].index;
     var end = routeInstructions[routeInstructions.length-1].index;
     var segmentCoordsArray = routeCoordinates.slice(start, end).map(coord => [coord.lat, coord.lng]);
     var instruction = routeInstructions[routeInstructions.length-1];
     instruction.coords = segmentCoordsArray;
 
-    //update global varieble
+    //Update global varieble
     routeDictionary[routeInstructions.length-1] = instruction;
     //console.log(JSON.stringify(routeDictionary, undefined, 4));
+    drawRoute();
+    console.log(routeSummary);
+}
+
+
+//Drawing a optimal route
+function drawRoute() {
+
+    //Check there are instructions
+    if (Object.keys(routeDictionary).length === 0) {
+        showToast("It was not possible to obtain a route.");
+        return;
+    }
+
+    //Get segment coords
+    var latlngs =[];
+    Object.entries(routeDictionary).forEach(([key, value]) => {
+        latlngs.push(value.coords);
+    });
+
+    //Remove before redrawing
+    if(leafletRouteId !== null){
+        map.removeLayer(leafletRouteId);
+    }
+    //Create multipolyline leaflet
+    leafletRouteId = L.polyline(latlngs, drawRouteOptions).addTo(map);
+
+    //Show/Hide HTML elements
+    showHideElements();
 }
 
 
 
+function startNavigation(){
+
+    //Ask if you want to start navigation on route
+    var startNavigation = confirm("Do you want to start navigating the found route?");
+    if (!startNavigation) {
+
+        //Remove the route  and selected parking from the map
+        map.removeLayer(leafletRouteId);
+        map.removeLayer(leafletParkingsIdArray[0]);
+
+        //Reset global variable
+        selectedParkingObject = null;
+        leafletRouteId = null;
+
+        //Show/Hide HTML elements
+        showHideElements();
+
+        //Start again the search for nearby parking lots
+        findParkings();
+    }
+    return;
+
+    // Ajustar el zoom del mapa para mostrar todas las líneas
+    //map.fitBounds(leafletRouteId.getBounds());
+
+    /*var a = 0; // Start with the first segment
+    setTimeout(() => {
+        var intervalId = setInterval(() => {
+            if (latlngs.length === 0 || a >= latlngs.length) {
+                // Stop the interval if no more segments
+                clearInterval(intervalId);
+                console.log("No more segments to remove.");
+                return;
+            }
+
+            // Remove one segment and update the polyline
+            latlngs.splice(a, 1);
+            leafletRouteId.setLatLngs(latlngs);
+
+            console.log(`Segment ${a} removed. Remaining segments:`, latlngs);
+        }, 5000);
+    }, 2000);
+    */
+
+}
 
 
 
@@ -940,16 +1068,18 @@ function initApp(){
     var divMap = document.getElementById("map");
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
+    var divNavButton = divMenu.querySelector(".fa-solid.fa-route");
     var divInitialScreen = document.getElementById("initial-screen-container");
 
-    //hide HTML elements
+    //Hide HTML elements
     divMap.style.display = "None";
     divMenu.style.display = "None";
     divCoordinates.style.display ="None";
+    //divNavButton.style.display ="None";
 
-    //after 4 seconds the second screen is displayed (map and menu)
+    //After 4 seconds the second screen is displayed (map and menu)
     setTimeout(() => {
-        //hide initial screen
+        //Hide initial screen
         divInitialScreen.style.opacity = "0";
         setTimeout(() =>{
             //show second screen
@@ -966,49 +1096,80 @@ function initApp(){
 
 
 
+//Show or hide HTML elements
+function showHideElements(){
 
-function showHiddendivHtmlCoordinates(){
     //Init-Get HTML elements
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
     var textCoordinates = document.getElementById("coordinates-text");
+    var divNavButton = divMenu.querySelector(".fa-solid.fa-route");
 
-    //Chek there are coordinates
+    //-----------------Show and hide coordinates bar-----------------
     if(currentPosition.geometry.coordinates.length === 0){
-        //hide coordinates
+        //Hide coordinates
         divCoordinates.style.opacity = "0";
         textCoordinates.style.opacity = "0";
+        divNavButton.style.opacity = "0";
 
-        //set transform
-        divMenu.style.transform = "translateY(-18%)";
-
+        //Set transform
         setTimeout(() =>{
+            divCoordinates.style.display = "none";
+            divNavButton.style.display = "none";
+            divMenu.style.height = "110px";
+            divMenu.style.transform = "translateY(-18%)";
             document.getElementById("coordinates-text").innerHTML = "";
-        }, 3000);
+        }, 1000);
     }
     else{
-        //show coordinates
-        divCoordinates.style.display = "block";
-        divCoordinates.style.opacity = "1";
-        textCoordinates.style.opacity = "1";
-
-        //set transform
+        //Set transform
         divMenu.style.transform = "translateY(-50%)";
+
+        //Show coordinates
+        setTimeout(() =>{
+            divCoordinates.style.display = "block";
+            setTimeout(()=>{
+                divCoordinates.style.opacity = "1";
+                textCoordinates.style.opacity = "1";
+            },500);
+        },500);
+    }
+
+    //-----------------Show and hide navigation button-----------------
+    if(leafletRouteId !== null){
+
+        divMenu.style.height = "170px";
+        divMenu.style.transform = "translateY(-28%)";
+
+        divNavButton.style.display = "block";
+        setTimeout(() =>{
+            divNavButton.style.opacity = "1";
+        }, 500);
+    }
+    else{
+        if(currentPosition.geometry.coordinates.length !== 0){
+        divNavButton.style.opacity = "0";
+        divNavButton.style.display = "none";
+        divMenu.style.height = "110px";
+        divMenu.style.transform = "translateY(-50%)";
+        }
     }
 }
 
 
 
 
+
 //Toast
 function showToast(message){
+
     var toast = document.getElementById("toast");
 
-    //show toast
+    //Show toast
     toast.innerHTML = message;
     toast.style.opacity= "1";
 
-    //hide toast
+    //Hide toast
     setTimeout(() =>{
         toast.style.opacity= "0";
     }, 3000); //3seg
@@ -1019,6 +1180,7 @@ function showToast(message){
 
 //Change the display format of coordinates
 function currentFormatCoordinates () {
+
     //Check format coordinates
     if (formatCoords == "geo") {
         formatCoords = "dms";
@@ -1029,36 +1191,62 @@ function currentFormatCoordinates () {
     else if (formatCoords=="utm"){
         formatCoords = "geo";
     }
-    //update coordinates format
+    //Update coordinates format
     formatCoordinates();
 }
 
 
 
-//conversion between coordinate systems
-function geoToUTM(geoPoint){
-    //get UTM zone
-    longitude = geoPoint[0];
+//Conversion between coordinate systems
+function geoToUTM(geoPoint){//geopoint=[lng, lat]
+
+    //Get UTM zone
+    var longitude = geoPoint[0];
     var zone = 1 + Math.floor((longitude+180)/6);//source: https://stackoverflow.com/questions/29655256/proj4js-can-you-convert-a-lat-long-to-utm-without-a-zone
 
     //From geo to utm
-    //origin and target CRSs
+    //Origin and target CRSs
     proj4.defs("UTM", "+proj=utm +zone=" + zone.toString() + "+ellps=GRS80 +units=m +no_defs"); //+no_defs: no default value
     proj4.defs("EPSG:4326", "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs");
 
-    //convert to utm coordinates
+    //Convert to utm coordinates
     var utmPoint = proj4(proj4("EPSG:4326"), proj4("UTM"), geoPoint);
 
     return [utmPoint, zone];
 }
 
 
+//Calculation of the Euclidean distance between two points
+function calculateDistance(pto1Coords, pto2Coords){//[lng, lat], [lng, lat]
 
-//change the current format coordinates
-function formatCoordinates(){
     //Check there are coordinates
-    if (currentPosition.geometry.coordinates[0] == undefined){
-        //alert("It is necessary to know your position before changing the coordinate format.");
+    if (pto1Coords.length === 0 && pto2Coords.length === 0){
+        return;
+    }
+
+    //UTM coordinates pto1
+    var utmPto1 = geoToUTM(pto1Coords)[0];//[x,y]
+    var XutmPto1 = utmPto1[0];
+    var YutmPto1 = utmPto1[1];
+
+    //UTM coordinates pto2
+    var utmPto2 = geoToUTM(pto2Coords)[0];//[x,y]
+    var XutmPto2 = utmPto2[0];
+    var YutmPto2 = utmPto2[1];
+
+    //Distance calculation
+    var squareDistance = Math.pow(XutmPto1 - XutmPto2, 2) + Math.pow(YutmPto1 - YutmPto2, 2);
+
+    return squareDistance;
+}
+
+
+
+//Change the current format coordinates
+function formatCoordinates(){
+
+    //Check there are coordinates
+    if (currentPosition.geometry.coordinates.length === 0){
         showAlert("It is necessary to know your position before changing the coordinate format.");
         return;
     }
@@ -1072,8 +1260,8 @@ function formatCoordinates(){
 
     //--------------------------format geo--------------------------
     if (formatCoords == "geo"){
-        //coordinates with 8 decimals
-        //output
+        //Coordinates with 8 decimals
+        //Output
         coordinatesString += latitude.toFixed(8);
         coordinatesString += separator;
         coordinatesString += longitude.toFixed(8);
@@ -1089,17 +1277,17 @@ function formatCoordinates(){
             hemisphere ="W";
             longitude *= -1;
         }
-        //conversion
+        //Conversion
         var degrees = Math.floor(longitude);
         var minutes = Math.floor((longitude - degrees) * 60);
         var seconds = ((longitude - degrees) * 60 - minutes) * 60;
 
-        //number to string
+        //Number to string
         degrees = degrees.toString();
         minutes = minutes.toString();
         seconds = seconds.toFixed(3).toString(); // 3 decimals
 
-        //format DDº MM' SS.SSS"
+        //Format DDº MM' SS.SSS"
         if (degrees.length < 2){ degrees = degrees.padStart(2,0); }
         if (minutes.length < 2){ minutes = minutes.padStart(2,0); }
         if (seconds.split(".")[0].length < 2){ seconds = seconds.padStart(6,0); }
@@ -1114,24 +1302,24 @@ function formatCoordinates(){
             hemisphere ="S";
             latitude *= -1;
         }
-        //conversion
+        //Conversion
         degrees = Math.floor(latitude);
         minutes = Math.floor((latitude - degrees) * 60);
         seconds = ((latitude - degrees) * 60 - minutes) * 60;
 
-        //to string
+        //To string
         degrees = degrees.toString();
         minutes = minutes.toString();
         seconds = seconds.toFixed(3).toString(); //3 decimals
 
-        //format DDº MM' SS.SSS"
+        //Format DDº MM' SS.SSS"
         if (degrees.length < 2){ degrees = degrees.padStart(2,0); }
         if (minutes.length < 2){ minutes = minutes.padStart(2,0); }
         if (seconds.split(".")[0].length < 2){ seconds = seconds.padStart(6,0); }
 
         latitude = degrees + "\u{00B0}" + minutes + "\u{0027}" + seconds + "\u{0022}" + hemisphere;
 
-        //output
+        //Output
         coordinatesString += latitude;
         coordinatesString += separator;
         coordinatesString += longitude;
@@ -1143,7 +1331,7 @@ function formatCoordinates(){
         // Init
         var geoPoint=[longitude, latitude];
 
-        //coordinate conversion
+        //Coordinate conversion
         var utmPoint_zone = geoToUTM(geoPoint);
         var utmPoint = utmPoint_zone[0];
         var zone = utmPoint_zone[1];
@@ -1151,7 +1339,7 @@ function formatCoordinates(){
         var xUTM = utmPoint[0].toFixed(3).toString();
         var yUTM = utmPoint[1].toFixed(3).toString();
 
-        //output
+        //Output
         coordinatesString += zone;
         coordinatesString += separator;
         coordinatesString += xUTM;
@@ -1160,7 +1348,7 @@ function formatCoordinates(){
         coordinatesString += separator;
         coordinatesString += "[" + accuracy.toFixed(2) + "]";
     }
-    //output
+    //Output
     document.getElementById("coordinates-text").innerHTML = coordinatesString;
 }
 
