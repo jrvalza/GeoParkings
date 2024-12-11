@@ -4,10 +4,6 @@
 //----------------------------------------------Global variables----------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
-
-
-
-
 //--------------------------------Cordova Plugins--------------------------------
 
 //Cordova-plugin-device-orientation
@@ -64,11 +60,6 @@ var parking ={
     "properties": {}
 };
 
-//Time control for periodic GET requests ->apiParkings()
-var getParkingTimeout = null;
-var getParkingInterval = null;
-var showParkingInterval = null;
-
 //Save parkings GeoJSON grom GET request
 var parkingArray = [];
 
@@ -124,7 +115,7 @@ var selectedParkingObject = null;
 var router = L.Routing.osrmv1({
     serviceUrl: 'https://router.project-osrm.org/route/v1', // OSRM server
     timeout: 10000, //10seg
-    profile: "driving",
+    profile: "driving"
 });
 
 //Route found
@@ -151,9 +142,14 @@ var formatCoords = "geo";
 var refDistance = 1500;//1.5km
 var squareDistanceRef = Math.pow(refDistance, 2);
 
+//Distance between our position at instant t and t+1
+var distance_t_t1 = null;
 
-
-
+//Time control for periodical execution of functions
+var getParkingTimeout = null;
+var getParkingInterval = null;
+var showParkingInterval = null;
+var findRoutInterval = null;
 
 
 
@@ -178,7 +174,6 @@ function onDeviceReady(){
     document.getElementsByClassName("fa-solid fa-location-dot")[0].addEventListener("click", toggleLocation);
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].addEventListener("click", findParkings);
     document.getElementsByClassName("fa-solid fa-route")[0].addEventListener("click", startNavigation);
-    //document.getElementsByClassName("fa-solid fa-layer-group")[0].addEventListener("click", drawRoute);
 }
 
 
@@ -252,6 +247,14 @@ function geolocationSucess(position){
     //Fill a global var initialPosition (geojson)
     if (initialPosition.geometry.coordinates.length === 0){
         initialPosition.geometry.coordinates = [currentPosition.geometry.coordinates[0], currentPosition.geometry.coordinates[1]];//[lng, lat]
+    }
+
+    //Distance calculation between our position at instant t and t+1
+    distance_t_t1 = calculateDistance(initialPosition.geometry.coordinates, currentPosition.geometry.coordinates);
+
+    //Update initial position coordinates. 50m position change
+    if (distance_t_t1 > 2500){
+        initialPosition.geometry.coordinates = currentPosition.geometry.coordinates;
     }
 
     //PRUEBA-------------BORRAR AL PASAR A CORDOVA
@@ -330,6 +333,24 @@ function findParkings(){
         //cordova
         //showAlert("It is necessary to know your location before searching for parking spaces.");
         return;
+    }
+
+    //Remove the route  and selected parking from the map
+    if (leafletRouteId !== null){
+        map.removeLayer(leafletRouteId);
+
+        //Reset global variable
+        selectedParkingObject = null;
+        leafletRouteId = null;
+        routeDictionary = {};
+
+        if (findRoutInterval !== null){
+            clearInterval(findRoutInterval);
+            findRoutInterval = null;
+        }
+
+        //Show/Hide HTML elements
+        showHideElements();
     }
 
     //Change search icon color
@@ -528,17 +549,11 @@ function drawParking(){
     //Check there are parkings on map
     if (leafletParkingsIdArray.length !== 0){
 
-        //Distance calculation between our position at instant t and t+1
-        var distance = calculateDistance(initialPosition.geometry.coordinates, currentPosition.geometry.coordinates);
-
         //Update nearby parking lots on the map only when our position changes by 50 m from the previous one
-        if (distance <= 2500){
+        if (distance_t_t1 <= 2500){
             return;
         }
     }
-
-    //Update initial position coordinates
-    initialPosition.geometry.coordinates = currentPosition.geometry.coordinates;
 
     //Clear map leaflet each new user position
     if (leafletParkingsIdArray.length !== 0){
@@ -644,6 +659,8 @@ function clearMemory(){
     }*/
 
     //Clear memory
+    distance_t_t1 = null;
+
     parkingArray = [];
 
     initialPosition ={
@@ -693,8 +710,6 @@ function clearMemory(){
         map.removeLayer(leafletRouteId);
         leafletRouteId = null;
     }
-
-    //--------------Routing--------------
     selectedParkingObject = null;
     routeDictionary = {};
 
@@ -712,6 +727,10 @@ function clearMemory(){
     if (showParkingInterval !== null) {
         clearInterval(showParkingInterval);
         showParkingInterval = null;
+    }
+    if (findRoutInterval !== null){
+        clearInterval(findRoutInterval);
+        findRoutInterval = null;
     }
 
     //Show/Hide HTML elements
@@ -815,9 +834,6 @@ function showConfirm(message){
 //Callback function to confirm a user action
 function onConfirm(buttonIndex){
     return buttonIndex;
-    //if (buttonIndex == 1){
-    //    console.log("Confirm");
-    //}
 }
 
 
@@ -841,7 +857,7 @@ function onClickParking(marker) {
 
 
 
-
+//Parking popup button function
 function onlySelectedParkingOnMap(){
 
     //Ask if you want to start searching for a route
@@ -884,8 +900,24 @@ function onlySelectedParkingOnMap(){
     //Get coordinates of selected parking
     var selectedParkingCoords = [selectedParkingObject.latlng.lat, selectedParkingObject.latlng.lng];
 
-    //Find a optimal route
-    findRoute(selectedParkingCoords);
+    //Find a optimal route each x seg
+    if ( findRoutInterval === null){
+
+        //Initial route obteined
+        findRoute(selectedParkingCoords);
+
+        //Update route each 10s and in case of change of position in more than 50m
+        findRoutInterval = setInterval(() => {
+
+            if (distance_t_t1 < 2500) {
+                console.log("findRoutInterval - distancia: " + distance_t_t1);
+                return;
+            }
+            console.log("findRoute. distancia: " + distance_t_t1);
+
+            findRoute(selectedParkingCoords);
+        }, 10000); // 10s
+    }
 }
 
 
@@ -918,8 +950,8 @@ function findRoute(selectedParkingCoords) {
 
             //In case of error in the GET request
             if (error) {
-                showToast("Error when searching for the route: " + error);
-                return;
+                showToast("Error when searching for the route" );
+                //return;
             }
             //Route found
             var routeObject = routes[0];
@@ -944,6 +976,9 @@ function processRoute(routeObject){
     var routeCoordinates = routeObject.coordinates;
     var routeInstructions = routeObject.instructions;
     var routeSummary = routeObject.summary;
+
+    //reset global variable
+    routeDictionary = {};
 
     //Get route vertices with instructions
     for (var count = 1; count < routeInstructions.length; count++){
@@ -972,9 +1007,8 @@ function processRoute(routeObject){
 
     //Update global varieble
     routeDictionary[routeInstructions.length-1] = instruction;
-    //console.log(JSON.stringify(routeDictionary, undefined, 4));
+
     drawRoute();
-    console.log(routeSummary);
 }
 
 
@@ -1000,6 +1034,9 @@ function drawRoute() {
     //Create multipolyline leaflet
     leafletRouteId = L.polyline(latlngs, drawRouteOptions).addTo(map);
 
+    //Zoom to route
+    map.fitBounds(leafletRouteId.getBounds(), { animate: true, duration: 3 });
+
     //Show/Hide HTML elements
     showHideElements();
 }
@@ -1010,7 +1047,19 @@ function startNavigation(){
 
     //Ask if you want to start navigation on route
     var startNavigation = confirm("Do you want to start navigating the found route?");
+
+    /*//Cordova
+    //Ask to find a route
+    var searchRoute = onConfirm("Do you want to start navigating the found route?");
+    if (searchRoute === 2){//Cancel
+        return
+    }*/
+
+        //1.Cancel option
     if (!startNavigation) {
+
+        //Change color of the icon route
+        document.getElementsByClassName("fa-solid fa-route")[0].style.color = "black";
 
         //Remove the route  and selected parking from the map
         map.removeLayer(leafletRouteId);
@@ -1019,6 +1068,12 @@ function startNavigation(){
         //Reset global variable
         selectedParkingObject = null;
         leafletRouteId = null;
+        routeDictionary = {};
+
+        if (findRoutInterval !== null){
+            clearInterval(findRoutInterval);
+            findRoutInterval = null;
+        }
 
         //Show/Hide HTML elements
         showHideElements();
@@ -1026,29 +1081,20 @@ function startNavigation(){
         //Start again the search for nearby parking lots
         findParkings();
     }
-    return;
 
-    // Ajustar el zoom del mapa para mostrar todas las líneas
-    //map.fitBounds(leafletRouteId.getBounds());
+    //2.Acept option
+    //Stop GET request for a route with the OSRM router
+    if (findRoutInterval !== null){
+        clearInterval(findRoutInterval);
+        findRoutInterval = null;
+    }
 
-    /*var a = 0; // Start with the first segment
-    setTimeout(() => {
-        var intervalId = setInterval(() => {
-            if (latlngs.length === 0 || a >= latlngs.length) {
-                // Stop the interval if no more segments
-                clearInterval(intervalId);
-                console.log("No more segments to remove.");
-                return;
-            }
+    //Change color of the findParking button and icon route
+    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+    document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
 
-            // Remove one segment and update the polyline
-            latlngs.splice(a, 1);
-            leafletRouteId.setLatLngs(latlngs);
-
-            console.log(`Segment ${a} removed. Remaining segments:`, latlngs);
-        }, 5000);
-    }, 2000);
-    */
+    //Navigation panel initialization
+    console.log("startNavigacion()");
 
 }
 
@@ -1068,14 +1114,12 @@ function initApp(){
     var divMap = document.getElementById("map");
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
-    var divNavButton = divMenu.querySelector(".fa-solid.fa-route");
     var divInitialScreen = document.getElementById("initial-screen-container");
 
     //Hide HTML elements
     divMap.style.display = "None";
     divMenu.style.display = "None";
     divCoordinates.style.display ="None";
-    //divNavButton.style.display ="None";
 
     //After 4 seconds the second screen is displayed (map and menu)
     setTimeout(() => {
@@ -1148,6 +1192,7 @@ function showHideElements(){
     }
     else{
         if(currentPosition.geometry.coordinates.length !== 0){
+
         divNavButton.style.opacity = "0";
         divNavButton.style.display = "none";
         divMenu.style.height = "110px";
