@@ -119,13 +119,12 @@ var router = L.Routing.osrmv1({
 });
 
 //Route found
-var routeDictionary = {};
+var routeArray = [];
 
 //DrawRoute options
 var drawRouteOptions = {
-    color: 'blue',
+    color: 'rgba(0, 166,217, 0.6)',
     weight: 8,
-    opacity: 0.3,
     lineCap: 'round',
     lineJoin: 'round',
 };
@@ -228,11 +227,12 @@ function toggleLocation(){
 
 
 var a = 0;//BORRAR AL PASAR A CORDOVA
+var f = 0;
 //Geolocation success
 function geolocationSucess(position){
 
     //PRUEBA---------BORRAR AL PASAR A CORDOVA
-    a +=0.001;
+    a +=0.00001;
     var dlat = -2*a;
     var dlon = -a
 
@@ -244,7 +244,7 @@ function geolocationSucess(position){
     currentPosition.properties.accuracy = position.coords.accuracy;
     currentPosition.properties.timestamp = position.timestamp;
 
-    //Fill a global var initialPosition (geojson)
+    //Fill a global variable initialPosition (geojson)
     if (initialPosition.geometry.coordinates.length === 0){
         initialPosition.geometry.coordinates = [currentPosition.geometry.coordinates[0], currentPosition.geometry.coordinates[1]];//[lng, lat]
     }
@@ -261,19 +261,25 @@ function geolocationSucess(position){
     if (leafletCurrentPositionId === null && currentPosition.geometry.coordinates.length !==0){
         compassAngle = -45
         drawCurrentPosition(compassAngle);
+        map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=16, {animate: true, duration: 3});
     }
 
     //Update the coordinates of our position marker
     if (leafletCurrentPositionId !== null){
         var newLatLng = L.latLng(currentPosition.geometry.coordinates[1], currentPosition.geometry.coordinates[0]);//[lat,lng]
+
+        //ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
+        if (coords !==null && navigationRouteInterval !== null){
+            f+=1;
+            newLatLng = L.latLng(coords[f].lat, coords[f].lng)
+        }
+
         leafletCurrentPositionId.setLatLng(newLatLng);
 
         //Show/Hide HTML elements
         formatCoordinates();
         showHideElements();
     }
-
-    //Zoom to existing map elements
 }
 
 
@@ -336,22 +342,7 @@ function findParkings(){
     }
 
     //Remove the route  and selected parking from the map
-    if (leafletRouteId !== null){
-        map.removeLayer(leafletRouteId);
-
-        //Reset global variable
-        selectedParkingObject = null;
-        leafletRouteId = null;
-        routeDictionary = {};
-
-        if (findRoutInterval !== null){
-            clearInterval(findRoutInterval);
-            findRoutInterval = null;
-        }
-
-        //Show/Hide HTML elements
-        showHideElements();
-    }
+    clearMemoryNavigation();
 
     //Change search icon color
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "orange";
@@ -392,6 +383,11 @@ function getParkings() {
 
     //Clear global variable
     parkingArray = [];
+    if (showParkingInterval !== null) {
+        clearInterval(showParkingInterval);
+        showParkingInterval = null;
+    }
+
 
 	//Url of the API of public parking lots in the city of Valencia
 	var url = "https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets/parkings/records?limit=25";
@@ -460,7 +456,16 @@ function nearParking(){
         if (squareDistance < squareDistanceRef) {
             nearParkingArray.push(parkingJSON);
         }
-    })
+    });
+
+    //Change search icon color
+    if(nearParkingArray.length === 0){
+        showToast("There are no nearby parking facilities.");
+        document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+    }
+    else{
+        document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "cyan";
+    }
     return nearParkingArray;
 }
 
@@ -474,7 +479,7 @@ function nearParking(){
 
 
 //------------------------------------------------------------------------------------------------------------
-//---------------------------------------------Data visualization---------------------------------------------
+//--------------------------------------------------Draw data-------------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
 //------Icons------
@@ -546,36 +551,29 @@ function getCustomParkingIcon(point) {
 //------Show nerby parkings------
 function drawParking(){
 
-    //Check there are parkings on map
-    if (leafletParkingsIdArray.length !== 0){
-
-        //Update nearby parking lots on the map only when our position changes by 50 m from the previous one
-        if (distance_t_t1 <= 2500){
-            return;
-        }
-    }
-
-    //Clear map leaflet each new user position
-    if (leafletParkingsIdArray.length !== 0){
-        for (var count = 0; count < leafletParkingsIdArray.length; count++){
-            map.removeLayer(leafletParkingsIdArray[count]);
-        };
-    }
-
-    //Reset global variable value
-    leafletParkingsIdArray = [];
-
     //------Get nearby parkings------
     var nearParkingArray = nearParking();
 
-    //Check there are points
-    if (nearParkingArray.length === 0){
+    //Update nearby parking lots on the map only when our position changes by 50 m from the previous one
+    if (leafletParkingsIdArray.length !== 0){
+        if (distance_t_t1 <= 2500){
+            return;
+        }
+        //Clear map leaflet each new user position
+        else{
+            for (var count = 0; count < leafletParkingsIdArray.length; count++){
+                map.removeLayer(leafletParkingsIdArray[count]);
+            };
+            //Reset global variable value
+            leafletParkingsIdArray = [];
+        }
+    }
 
-        //REVISAR ESTA TOSTADA PARA QUE SOLO SE MUESTRE EN CASO DE NO TENER PARKINGS CERCANOS
-        //showToast("There are no nearby parking facilities.");
-        document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+    //Check there are nearby parkings
+    if (nearParkingArray.length === 0){
         return;
     }
+
     //Draw points
     nearParkingArray.forEach((parking) => {
         //Popup and style icon
@@ -602,8 +600,16 @@ function drawParking(){
         leafletParkingsIdArray.push(leafletPointID);
     })
 
-    //Change search icon color
-    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "cyan";
+    //---------Zoom to parkings---------
+    //get parkings bounds
+    var parkingsBounds = L.latLngBounds(
+        leafletParkingsIdArray.map(marker => marker.getLatLng())
+    );
+    //add current position to parkings bounds
+    parkingsBounds.extend(leafletCurrentPositionId.getLatLng());
+
+    //map fit bounds
+    map.fitBounds(parkingsBounds, { padding:[50,50], animate: true, duration: 3 });
 }
 
 
@@ -627,10 +633,6 @@ function drawCurrentPosition(compassAngle){
 
     //Add point to map
     leafletCurrentPositionId.addTo(map);
-
-    //REVISAR ANTES DE ENTREGA FINAL
-    //Zoom to current position
-    map.setView(currentPosition.geometry.coordinates.toReversed(), 14);
 }
 
 
@@ -705,15 +707,8 @@ function clearMemory(){
     map.removeLayer(leafletCurrentPositionId);
     leafletCurrentPositionId = null;
 
-    //Remove route
-    if (leafletRouteId !== null) {
-        map.removeLayer(leafletRouteId);
-        leafletRouteId = null;
-    }
-    selectedParkingObject = null;
-    routeDictionary = {};
-
-
+    //Remove routing variables
+    clearMemoryNavigation();
 
     //--------------Clear timeout and intervals--------------
     if (getParkingTimeout !== null) {
@@ -727,10 +722,6 @@ function clearMemory(){
     if (showParkingInterval !== null) {
         clearInterval(showParkingInterval);
         showParkingInterval = null;
-    }
-    if (findRoutInterval !== null){
-        clearInterval(findRoutInterval);
-        findRoutInterval = null;
     }
 
     //Show/Hide HTML elements
@@ -746,9 +737,45 @@ function clearMemory(){
 
 
 
+function clearMemoryNavigation(){
+    //Remove the route from the map
+    if (leafletRouteId !== null){
+        map.removeLayer(leafletRouteId);
+        leafletRouteId = null;
+        routeArray = [];
+    }
 
+    //Remove the selected parking from the map
+    if (selectedParkingObject !== null){
+        if (leafletParkingsIdArray.length !==0){
+            map.removeLayer(leafletParkingsIdArray[0]);
+            leafletParkingsIdArray = [];
+        }
+        selectedParkingObject = null;
+    }
 
+    //Clear all variables of current navigation
+    if (navigationRouteInterval !== null){
+        map.removeLayer(currentSegmentLeafletId);
+        currentSegmentLeafletId = null;
+        currentInstructionIndex = 0;
 
+        clearInterval(navigationRouteInterval);
+        navigationRouteInterval = null;
+    }
+
+    //Reset find route interval
+    if (findRoutInterval !== null){
+        clearInterval(findRoutInterval);
+        findRoutInterval = null;
+    }
+
+    //Change color of the icon route
+    document.getElementsByClassName("fa-solid fa-route")[0].style.color = "black";
+
+    //Show/Hide HTML elements
+    showHideElements();
+}
 
 
 
@@ -780,6 +807,9 @@ function onSuccessCompass(heading) {
     //Drawing for the first time our position
     if (leafletCurrentPositionId === null && currentPosition.geometry.coordinates.length !==0){
         drawCurrentPosition(compassAngle);
+
+        //Zoom to current position
+        map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=16, {animate: true, duration: 3});
     }
     else if (leafletCurrentPositionId){
 
@@ -910,18 +940,12 @@ function onlySelectedParkingOnMap(){
         findRoutInterval = setInterval(() => {
 
             if (distance_t_t1 < 2500) {
-                console.log("findRoutInterval - distancia: " + distance_t_t1);
                 return;
             }
-            console.log("findRoute. distancia: " + distance_t_t1);
-
             findRoute(selectedParkingCoords);
         }, 10000); // 10s
     }
 }
-
-
-
 
 
 
@@ -951,7 +975,7 @@ function findRoute(selectedParkingCoords) {
             //In case of error in the GET request
             if (error) {
                 showToast("Error when searching for the route" );
-                //return;
+                return;
             }
             //Route found
             var routeObject = routes[0];
@@ -963,7 +987,47 @@ function findRoute(selectedParkingCoords) {
 }
 
 
-//Organizing route information in the form of a dictionary
+
+
+//Get the name of the icon for each instruction
+function instructionIconName(instruction, index) {
+    switch (instruction.type) {
+        case 'Head':
+            if (index === 0) {
+                return 'depart';
+            }
+            break;
+        case 'WaypointReached':
+            return 'via';
+        case 'Roundabout':
+            return 'enter-roundabout';
+        case 'DestinationReached':
+            return 'arrive';
+    }
+
+    switch (instruction.modifier) {
+        case 'Straight':
+            return 'continue';
+        case 'SlightRight':
+            return 'bear-right';
+        case 'Right':
+            return 'turn-right';
+        case 'SharpRight':
+            return 'sharp-right';
+        case 'TurnAround':
+        case 'Uturn':
+            return 'u-turn';
+        case 'SharpLeft':
+            return 'sharp-left';
+        case 'Left':
+            return 'turn-left';
+        case 'SlightLeft':
+            return 'bear-left';
+    }
+}
+
+
+//Organizing route information
 function processRoute(routeObject){
 
     //Check that a route exists
@@ -977,8 +1041,16 @@ function processRoute(routeObject){
     var routeInstructions = routeObject.instructions;
     var routeSummary = routeObject.summary;
 
+    //Add the name of the icon each instruction
+    routeInstructions.forEach((instruction, index) => {
+        var iconName = instructionIconName(instruction, index);
+        instruction.icon = 'leaflet-routing-icon leaflet-routing-icon-' + iconName;
+    });
+
+    coords = routeCoordinates;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
+
     //reset global variable
-    routeDictionary = {};
+    routeArray = [];
 
     //Get route vertices with instructions
     for (var count = 1; count < routeInstructions.length; count++){
@@ -995,7 +1067,7 @@ function processRoute(routeObject){
         instruction.coords = segmentCoordsArray;
 
         //Update global variable
-        routeDictionary[count-1] = instruction;
+        routeArray.push(instruction);
     }
 
     //End instruction
@@ -1006,7 +1078,7 @@ function processRoute(routeObject){
     instruction.coords = segmentCoordsArray;
 
     //Update global varieble
-    routeDictionary[routeInstructions.length-1] = instruction;
+    routeArray.push(instruction);
 
     drawRoute();
 }
@@ -1016,15 +1088,15 @@ function processRoute(routeObject){
 function drawRoute() {
 
     //Check there are instructions
-    if (Object.keys(routeDictionary).length === 0) {
+    if (routeArray.length === 0) {
         showToast("It was not possible to obtain a route.");
         return;
     }
 
     //Get segment coords
     var latlngs =[];
-    Object.entries(routeDictionary).forEach(([key, value]) => {
-        latlngs.push(value.coords);
+    routeArray.forEach((segment) => {
+        latlngs.push(segment.coords);
     });
 
     //Remove before redrawing
@@ -1035,11 +1107,13 @@ function drawRoute() {
     leafletRouteId = L.polyline(latlngs, drawRouteOptions).addTo(map);
 
     //Zoom to route
-    map.fitBounds(leafletRouteId.getBounds(), { animate: true, duration: 3 });
+    map.fitBounds(leafletRouteId.getBounds(), { padding:[10,10], animate: true, duration: 3 });
 
     //Show/Hide HTML elements
     showHideElements();
 }
+
+
 
 
 
@@ -1055,48 +1129,130 @@ function startNavigation(){
         return
     }*/
 
-        //1.Cancel option
+    //1.Cancel option
     if (!startNavigation) {
 
-        //Change color of the icon route
-        document.getElementsByClassName("fa-solid fa-route")[0].style.color = "black";
-
-        //Remove the route  and selected parking from the map
-        map.removeLayer(leafletRouteId);
-        map.removeLayer(leafletParkingsIdArray[0]);
-
-        //Reset global variable
-        selectedParkingObject = null;
-        leafletRouteId = null;
-        routeDictionary = {};
-
-        if (findRoutInterval !== null){
-            clearInterval(findRoutInterval);
-            findRoutInterval = null;
-        }
+        //Remove and clear all variebale of navigation
+        clearMemoryNavigation();
 
         //Show/Hide HTML elements
         showHideElements();
 
         //Start again the search for nearby parking lots
         findParkings();
+
+        return;
     }
 
     //2.Acept option
+    //Show/Hide HTML elements
+    showHideElements();
+
     //Stop GET request for a route with the OSRM router
     if (findRoutInterval !== null){
         clearInterval(findRoutInterval);
         findRoutInterval = null;
     }
 
+
     //Change color of the findParking button and icon route
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
     document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
 
     //Navigation panel initialization
-    console.log("startNavigacion()");
+    drawNavigationRoute();
+}
+
+
+
+
+
+var coords = null;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
+
+var navigationRouteInterval = null;
+var currentInstructionIndex = 0;
+function drawNavigationRoute(){
+
+    //Check there is a route
+    if(routeArray.length === 0){
+        return;
+    }
+
+    //remove found route
+    map.removeLayer(leafletRouteId);
+    leafletRouteId = null;
+
+
+    //current segment draw options
+    var currentSegmentDrawRouteOptions = Object.assign({}, drawRouteOptions);
+    currentSegmentDrawRouteOptions.color = 'rgba(255, 93, 0, 0.6)';
+
+    //look for instruction every 1 second
+    navigationRouteInterval = setInterval(() => {
+
+        //first instruction
+        if (currentSegmentLeafletId === null) {
+            drawCurrentAndRestRoute(currentInstructionIndex, currentInstructionIndex+1, currentSegmentDrawRouteOptions);
+        }
+        //following instructions
+        else{
+
+            //check distance to new instruction
+            //between current position and first coordinates of next instruction
+            var nextInstructionDistance = calculateDistance([leafletCurrentPositionId.getLatLng().lng, leafletCurrentPositionId.getLatLng().lat],
+                                                            routeArray[currentInstructionIndex+1].coords[0].toReversed())//[lng,lat]
+            if(nextInstructionDistance > 400){//20m before
+                //console.log(currentSegmentDistance -(currentSegmentDistance - Math.pow(nextInstructionDistance, 0.5)));
+                return;
+            }
+
+            //new instruction
+            currentInstructionIndex += 1;
+            drawCurrentAndRestRoute(currentInstructionIndex, currentInstructionIndex+1, currentSegmentDrawRouteOptions);
+        }
+
+    }, 1000); // 1s
 
 }
+
+var currentSegmentLeafletId = null;
+var nextInstructionText = null; //Falta clear
+var currentSegmentDistance = null; //Falta clear
+function drawCurrentAndRestRoute(currentInstructionIndex, nextInstructionIndex, currentSegmentDrawRouteOptions){
+
+    //Remove polylines from map and reset global variables
+    if(currentSegmentLeafletId !== null && leafletRouteId !== null){
+        map.removeLayer(leafletRouteId);
+        leafletRouteId = null;
+        map.removeLayer(currentSegmentLeafletId);
+        currentSegmentLeafletId = null;
+    }
+
+    //draw current segment
+    var currentInstruction = routeArray[currentInstructionIndex];
+    currentSegmentLeafletId = L.polyline(currentInstruction.coords, currentSegmentDrawRouteOptions).addTo(map);
+    currentSegmentDistance = currentInstruction.distance;
+
+    //draw rest of the route
+    var restRoute = routeArray.slice(nextInstructionIndex);
+    var restRoutlatlngs =[];
+    restRoute.forEach((segment) => {
+        restRoutlatlngs.push(segment.coords);
+    });
+    leafletRouteId = L.polyline(restRoutlatlngs, drawRouteOptions).addTo(map);
+
+    //next instruction
+    var nextInstructionText = restRoute[0].text;
+    var iconInstruction = restRoute[0].icon;
+    console.log("In " + currentSegmentDistance + nextInstructionText);
+}
+
+
+
+
+
+
+
 
 
 
