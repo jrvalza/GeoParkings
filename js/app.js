@@ -1039,7 +1039,7 @@ function processRoute(routeObject){
     //Get data
     var routeCoordinates = routeObject.coordinates;
     var routeInstructions = routeObject.instructions;
-    var routeSummary = routeObject.summary;
+    routeSummary = routeObject.summary;
 
     //Add the name of the icon each instruction
     routeInstructions.forEach((instruction, index) => {
@@ -1197,8 +1197,7 @@ function drawNavigationRoute(){
         //following instructions
         else{
 
-            //check distance to new instruction
-            //between current position and first coordinates of next instruction
+            //check distance to new instruction between current position and first coordinates of next instruction
             var nextInstructionDistance = calculateDistance([leafletCurrentPositionId.getLatLng().lng, leafletCurrentPositionId.getLatLng().lat],
                                                             routeArray[currentInstructionIndex+1].coords[0].toReversed())//[lng,lat]
             if(nextInstructionDistance > 400){//20m before
@@ -1218,6 +1217,8 @@ function drawNavigationRoute(){
 var currentSegmentLeafletId = null;
 var nextInstructionText = null; //Falta clear
 var currentSegmentDistance = null; //Falta clear
+var routeSummary = null; //Falta clear
+
 function drawCurrentAndRestRoute(currentInstructionIndex, nextInstructionIndex, currentSegmentDrawRouteOptions){
 
     //Remove polylines from map and reset global variables
@@ -1241,10 +1242,24 @@ function drawCurrentAndRestRoute(currentInstructionIndex, nextInstructionIndex, 
     });
     leafletRouteId = L.polyline(restRoutlatlngs, drawRouteOptions).addTo(map);
 
-    //next instruction
+    ////Prueba
     var nextInstructionText = restRoute[0].text;
     var iconInstruction = restRoute[0].icon;
     console.log("In " + currentSegmentDistance + nextInstructionText);
+
+
+    var instructionsDiv = document.getElementById('instructions');
+    var instructionsText = document.getElementById('instructions-text');
+    instructionsDiv.innerHTML = '';
+    instructionsDiv.appendChild(instructionsText);
+
+
+    var iconDiv = document.createElement('div');
+    iconDiv.className = iconInstruction;
+    //añadir icono
+    instructionsDiv.appendChild(iconDiv);
+    //añadir texto
+    instructionsText.innerHTML = nextInstructionText;
 }
 
 

@@ -274,20 +274,20 @@ th {background-color: #f0f0f0;}
 
 /*Route instructions*/
 #instructions {
-    width: 90%;
-    height: 30px;
+    width: 70%;
+    height: 100px;
     left: 50%;
     bottom: 50px;
     position: fixed;
     line-height: 30px;
     text-align: center;
     border-radius: 10px;
-    background: rgba(0, 0, 0, 0.2);
-    transform: translate(-50%, -50%);
-    -ms-transform: translate(-50%, -50%);
-    -webkit-transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0);
+    transform: translate(-55%, -50%);
+    -ms-transform: translate(-55%, -50%);
+    -webkit-transform: translate(-55%, -50%);
     z-index: 1;
-    opacity: 0;
+    opacity: 1;
     transition: opacity 1s ease-in-out;
 }
 
@@ -303,34 +303,33 @@ th {background-color: #f0f0f0;}
     border-radius: 10px;
     vertical-align: middle;
     text-shadow: 1px 1px 2px black;
-    opacity: 0;
+    opacity: 1;
     transition: opacity 1s ease-in-out;
 }
 
 .leaflet-routing-icon {
     background-image: url('./images/leaflet.routing.icons.png');
     -webkit-background-size: 240px 20px;
-    background-size: 240px 20px;
+    background-size: 720px 60px;
     background-repeat: no-repeat;
     margin: 0;
     content: '';
     display: inline-block;
-    vertical-align: top;
-    width: 20px;
-    height: 20px;
+    width: 60px;
+    height: 60px;
 }
 
 .leaflet-routing-icon-continue         { background-position: 0 0; }
-.leaflet-routing-icon-sharp-right      { background-position: -20px 0; }
-.leaflet-routing-icon-turn-right       { background-position: -40px 0; }
-.leaflet-routing-icon-bear-right       { background-position: -60px 0; }
-.leaflet-routing-icon-u-turn           { background-position: -80px 0; }
-.leaflet-routing-icon-sharp-left       { background-position: -100px 0; }
-.leaflet-routing-icon-turn-left        { background-position: -120px 0; }
-.leaflet-routing-icon-bear-left        { background-position: -140px 0; }
-.leaflet-routing-icon-depart           { background-position: -160px 0; }
-.leaflet-routing-icon-enter-roundabout { background-position: -180px 0; }
-.leaflet-routing-icon-arrive           { background-position: -200px 0; }
-.leaflet-routing-icon-via              { background-position: -220px 0; }
+.leaflet-routing-icon-sharp-right      { background-position: -60px 0; }
+.leaflet-routing-icon-turn-right       { background-position: -120px 0; }
+.leaflet-routing-icon-bear-right       { background-position: -180px 0; }
+.leaflet-routing-icon-u-turn           { background-position: -240px 0; }
+.leaflet-routing-icon-sharp-left       { background-position: -300px 0; }
+.leaflet-routing-icon-turn-left        { background-position: -360px 0; }
+.leaflet-routing-icon-bear-left        { background-position: -420px 0; }
+.leaflet-routing-icon-depart           { background-position: -480px 0; }
+.leaflet-routing-icon-enter-roundabout { background-position: -540px 0; }
+.leaflet-routing-icon-arrive           { background-position: -600px 0; }
+.leaflet-routing-icon-via              { background-position: -660px 0; }
 
 
