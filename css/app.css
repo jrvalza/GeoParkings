@@ -101,6 +101,7 @@ html, body {
     -ms-transform: translate(-50%, -80%);
     -webkit-transform: translate(-50%, -80%);
     text-shadow: 1px 1px 2px black;
+    pointer-events: none;
     opacity: 0;
     transition: opacity 2s ease-in-out;
 }
@@ -283,12 +284,13 @@ th {background-color: #f0f0f0;}
     text-align: center;
     border-radius: 10px;
     background: rgba(0, 0, 0, 0);
-    transform: translate(-55%, -50%);
-    -ms-transform: translate(-55%, -50%);
-    -webkit-transform: translate(-55%, -50%);
+    transform: translate(-55%, -40%);
+    -ms-transform: translate(-55%, -40%);
+    -webkit-transform: translate(-55%, -40%);
     z-index: 1;
-    opacity: 1;
-    transition: opacity 1s ease-in-out;
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+    pointer-events: none;
 }
 
 
@@ -303,9 +305,11 @@ th {background-color: #f0f0f0;}
     border-radius: 10px;
     vertical-align: middle;
     text-shadow: 1px 1px 2px black;
-    opacity: 1;
-    transition: opacity 1s ease-in-out;
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+    pointer-events: none;
 }
+
 
 .leaflet-routing-icon {
     background-image: url('./images/leaflet.routing.icons.png');

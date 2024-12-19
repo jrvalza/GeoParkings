@@ -269,9 +269,9 @@ function geolocationSucess(position){
         var newLatLng = L.latLng(currentPosition.geometry.coordinates[1], currentPosition.geometry.coordinates[0]);//[lat,lng]
 
         //ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
-        if (coords !==null && navigationRouteInterval !== null){
+        if (coords.length !== 0 && navigationRouteInterval !== null){
             f+=1;
-            newLatLng = L.latLng(coords[f].lat, coords[f].lng)
+            newLatLng = L.latLng(coords[f][0], coords[f][1]);
         }
 
         leafletCurrentPositionId.setLatLng(newLatLng);
@@ -409,6 +409,15 @@ function getParkings() {
 
 			//Convert text to object JSON
 			jsonObjectParkings = JSON.parse(jsonText);
+
+            //Check there are parkings in the response
+            if( jsonObjectParkings.results.length === 0){
+                setTimeout(()=>{
+                    showToast("Something has gone wrong with the request for parking information.");
+                    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+                },3000);
+                return;
+            }
 
             //Extracting parkings information
             for (var count=0; count < jsonObjectParkings.results.length; count++){
@@ -743,6 +752,7 @@ function clearMemoryNavigation(){
         map.removeLayer(leafletRouteId);
         leafletRouteId = null;
         routeArray = [];
+        routeSummary = null;
     }
 
     //Remove the selected parking from the map
@@ -903,6 +913,9 @@ function onlySelectedParkingOnMap(){
         return
     }*/
 
+   //Close popup
+   map.closePopup();
+
     //Check that the leaflet object has been obtained from the selected parking lot.
     if (selectedParkingObject === null && leafletParkingsIdArray.length === 0){
         showToast("It was not possible to obtain a route.");
@@ -1040,14 +1053,13 @@ function processRoute(routeObject){
     var routeCoordinates = routeObject.coordinates;
     var routeInstructions = routeObject.instructions;
     routeSummary = routeObject.summary;
+    showToast('Distance to selected parking: ' + routeSummary.totalDistance + ' meters');
 
     //Add the name of the icon each instruction
     routeInstructions.forEach((instruction, index) => {
         var iconName = instructionIconName(instruction, index);
         instruction.icon = 'leaflet-routing-icon leaflet-routing-icon-' + iconName;
     });
-
-    coords = routeCoordinates;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
 
     //reset global variable
     routeArray = [];
@@ -1080,6 +1092,15 @@ function processRoute(routeObject){
     //Update global varieble
     routeArray.push(instruction);
 
+    //ELIMINAR SOLO ES PARA SIMULAR DESPLAZAMIENTO
+    //coords = routeCoordinates;
+    routeArray = routeArray.slice(-2);
+    coords = [];
+    routeArray.forEach((segment) => {
+        segment.coords.forEach((a) => {
+            coords.push(a)
+        })
+    });
     drawRoute();
 }
 
@@ -1107,7 +1128,7 @@ function drawRoute() {
     leafletRouteId = L.polyline(latlngs, drawRouteOptions).addTo(map);
 
     //Zoom to route
-    map.fitBounds(leafletRouteId.getBounds(), { padding:[10,10], animate: true, duration: 3 });
+    map.fitBounds(leafletRouteId.getBounds(), { padding:[20,20], animate: true, duration: 3 });
 
     //Show/Hide HTML elements
     showHideElements();
@@ -1132,11 +1153,11 @@ function startNavigation(){
     //1.Cancel option
     if (!startNavigation) {
 
-        //Remove and clear all variebale of navigation
-        clearMemoryNavigation();
-
         //Show/Hide HTML elements
         showHideElements();
+
+        //Remove and clear all variebale of navigation
+        clearMemoryNavigation();
 
         //Start again the search for nearby parking lots
         findParkings();
@@ -1145,8 +1166,11 @@ function startNavigation(){
     }
 
     //2.Acept option
+    //Zoom to current position
+    map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=17, {animate: true, duration: 3});
+
     //Show/Hide HTML elements
-    showHideElements();
+    //showHideElements();
 
     //Stop GET request for a route with the OSRM router
     if (findRoutInterval !== null){
@@ -1160,17 +1184,28 @@ function startNavigation(){
     document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
 
     //Navigation panel initialization
-    drawNavigationRoute();
+    setTimeout(()=>{
+        drawNavigationRoute();
+    },3000);
 }
 
 
 
 
 
-var coords = null;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
 
+
+
+var coords = [];//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
 var navigationRouteInterval = null;
 var currentInstructionIndex = 0;
+var currentSegmentLeafletId = null;
+var routeSummary = null;
+
+//Current segment draw options
+var currentSegmentDrawRouteOptions = Object.assign({}, drawRouteOptions);
+currentSegmentDrawRouteOptions.color = 'rgba(255, 93, 0, 0.6)';
+
 function drawNavigationRoute(){
 
     //Check there is a route
@@ -1178,88 +1213,130 @@ function drawNavigationRoute(){
         return;
     }
 
-    //remove found route
+    //Remove found route
     map.removeLayer(leafletRouteId);
     leafletRouteId = null;
 
-
-    //current segment draw options
-    var currentSegmentDrawRouteOptions = Object.assign({}, drawRouteOptions);
-    currentSegmentDrawRouteOptions.color = 'rgba(255, 93, 0, 0.6)';
-
-    //look for instruction every 1 second
+    //Show instructions for each 1 second
     navigationRouteInterval = setInterval(() => {
-
-        //first instruction
-        if (currentSegmentLeafletId === null) {
-            drawCurrentAndRestRoute(currentInstructionIndex, currentInstructionIndex+1, currentSegmentDrawRouteOptions);
-        }
-        //following instructions
-        else{
-
-            //check distance to new instruction between current position and first coordinates of next instruction
-            var nextInstructionDistance = calculateDistance([leafletCurrentPositionId.getLatLng().lng, leafletCurrentPositionId.getLatLng().lat],
-                                                            routeArray[currentInstructionIndex+1].coords[0].toReversed())//[lng,lat]
-            if(nextInstructionDistance > 400){//20m before
-                //console.log(currentSegmentDistance -(currentSegmentDistance - Math.pow(nextInstructionDistance, 0.5)));
-                return;
-            }
-
-            //new instruction
-            currentInstructionIndex += 1;
-            drawCurrentAndRestRoute(currentInstructionIndex, currentInstructionIndex+1, currentSegmentDrawRouteOptions);
-        }
-
+        map.panTo(leafletCurrentPositionId.getLatLng());
+        drawCurrentAndRestRoute();
     }, 1000); // 1s
-
 }
 
-var currentSegmentLeafletId = null;
-var nextInstructionText = null; //Falta clear
-var currentSegmentDistance = null; //Falta clear
-var routeSummary = null; //Falta clear
 
-function drawCurrentAndRestRoute(currentInstructionIndex, nextInstructionIndex, currentSegmentDrawRouteOptions){
+
+
+function drawCurrentAndRestRoute(){
 
     //Remove polylines from map and reset global variables
-    if(currentSegmentLeafletId !== null && leafletRouteId !== null){
-        map.removeLayer(leafletRouteId);
-        leafletRouteId = null;
+    if(currentSegmentLeafletId !== null){
         map.removeLayer(currentSegmentLeafletId);
         currentSegmentLeafletId = null;
     }
+    if(leafletRouteId !== null){
+        map.removeLayer(leafletRouteId);
+        leafletRouteId = null;
+    }
 
-    //draw current segment
-    var currentInstruction = routeArray[currentInstructionIndex];
-    currentSegmentLeafletId = L.polyline(currentInstruction.coords, currentSegmentDrawRouteOptions).addTo(map);
-    currentSegmentDistance = currentInstruction.distance;
+    //Draw segments
+    //Get segments. current and rest of the route
+    if (currentInstructionIndex < routeArray.length-2){
+        var currentSegment = routeArray[currentInstructionIndex];
+        var restRoute = routeArray.slice(currentInstructionIndex+1);
+        var restRoutlatlngs = [];
+        restRoute.forEach((segment) => { restRoutlatlngs.push(segment.coords) });
 
-    //draw rest of the route
-    var restRoute = routeArray.slice(nextInstructionIndex);
-    var restRoutlatlngs =[];
-    restRoute.forEach((segment) => {
-        restRoutlatlngs.push(segment.coords);
-    });
-    leafletRouteId = L.polyline(restRoutlatlngs, drawRouteOptions).addTo(map);
+        //Draw
+        currentSegmentLeafletId = L.polyline(currentSegment.coords, currentSegmentDrawRouteOptions).addTo(map);
+        leafletRouteId = L.polyline(restRoutlatlngs, drawRouteOptions).addTo(map);
+    }
+    else{//if (currentInstructionIndex === routeArray.length-1){
+        var currentSegment = routeArray[currentInstructionIndex];
+        var restRoute = currentSegment;
+        var restRoutlatlngs = restRoute.coords;
 
-    ////Prueba
-    var nextInstructionText = restRoute[0].text;
-    var iconInstruction = restRoute[0].icon;
-    console.log("In " + currentSegmentDistance + nextInstructionText);
+        //Draw
+        currentSegmentLeafletId = L.polyline(currentSegment.coords, currentSegmentDrawRouteOptions).addTo(map);
+    }
+
+    //show instructions
+    showInstruction(currentSegment, restRoute);
+}
 
 
+function showInstruction(currentSegment, restRoute){
+
+    //Show/Hide HTML elements
+    /*if (currentInstructionIndex === 0){
+        showHideElements();
+    }*/
+
+    //Icon and text instruction
+    var textInstruction;
+    var iconName;
+
+    //Icon and text current instruction
+    var iconNameCurrentInstruction = currentSegment.icon;
+    var textCurrentInstruction = currentSegment.text;
+
+    //check distance to new instruction between current position and first coordinates of next instruction
+    var distanceToNextInstruction;
+    if (restRoute !== currentSegment){
+        distanceToNextInstruction = Math.pow(calculateDistance([leafletCurrentPositionId.getLatLng().lng, leafletCurrentPositionId.getLatLng().lat],
+                                                                    restRoute[0].coords[0].toReversed()), 0.5);//[lng,lat]
+        //Icon and text next instruction
+        var iconNameNextInstruction = restRoute[0].icon;
+        var textNextInstruction = restRoute[0].text;
+    }
+    else{
+        var distanceToNextInstruction = Math.pow(calculateDistance([leafletCurrentPositionId.getLatLng().lng, leafletCurrentPositionId.getLatLng().lat],
+                                                                    restRoute.coords.slice(-1)[0].toReversed()), 0.5);//[lng,lat]
+        //Icon and text next instruction
+        var iconNameNextInstruction = restRoute.icon;
+        var textNextInstruction = restRoute.text;
+    }
+
+    //next instruction
+    var ratio = 1 - (distanceToNextInstruction / currentSegment.distance);
+    if (ratio > 0.95 && currentInstructionIndex < routeArray.length-1){//95% of the route has already been covered.
+        //next instruction
+        currentInstructionIndex += 1;
+    }
+
+    //------------------------Instructions in GUI------------------------
+
+    //Elements html
     var instructionsDiv = document.getElementById('instructions');
     var instructionsText = document.getElementById('instructions-text');
     instructionsDiv.innerHTML = '';
-    instructionsDiv.appendChild(instructionsText);
-
 
     var iconDiv = document.createElement('div');
-    iconDiv.className = iconInstruction;
-    //añadir icono
     instructionsDiv.appendChild(iconDiv);
-    //añadir texto
-    instructionsText.innerHTML = nextInstructionText;
+    instructionsDiv.appendChild(instructionsText);
+
+    //Set text and icon
+    if (ratio > 0.7 ){//70% of the route has already been covered.
+        //FALTA SOLUCIONAR ULTIMA INDICACIÓN
+        //MENSAJE Y VIBRACION TIENEN QUE IR AQUI CON UNA CONSFICION PARA QUE SOLO SE EJECUTE UNA VEZ SE ALCANZA EL 70% DEL SEGMENTO ACTUAL NAVEGADO.
+        textInstruction = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.\n` + textNextInstruction;
+        iconName = iconNameNextInstruction;
+    }
+    else{
+        textInstruction = textCurrentInstruction;
+        iconName = iconNameCurrentInstruction;
+    }
+
+    iconDiv.className = iconName;
+    instructionsText.innerHTML = textInstruction;
+
+    //Clear navigation memory when just arrive
+    if ( currentInstructionIndex === routeArray.length-1 ){
+        console.log("eflj")
+        setTimeout(()=>{
+            clearMemoryNavigation();
+        },15000);
+    }
 }
 
 
@@ -1286,11 +1363,13 @@ function initApp(){
     var divMenu = document.getElementById("menu");
     var divCoordinates = document.getElementById("coordinates");
     var divInitialScreen = document.getElementById("initial-screen-container");
-
+    var divInstructions = document.getElementById("instructions");
     //Hide HTML elements
     divMap.style.display = "None";
     divMenu.style.display = "None";
     divCoordinates.style.display ="None";
+    divInstructions.style.display = "None";
+
 
     //After 4 seconds the second screen is displayed (map and menu)
     setTimeout(() => {
@@ -1304,7 +1383,7 @@ function initApp(){
                 divMap.style.opacity = "1";
                 divMenu.style.opacity = "1";
             }, 0);//1000);
-        }, 0);//1000);
+        }, 0);// 1000);
     }, 0);//4000);
 }
 
@@ -1319,6 +1398,8 @@ function showHideElements(){
     var divCoordinates = document.getElementById("coordinates");
     var textCoordinates = document.getElementById("coordinates-text");
     var divNavButton = divMenu.querySelector(".fa-solid.fa-route");
+    var instructionsDiv = document.getElementById('instructions');
+    var instructionsText = document.getElementById('instructions-text');
 
     //-----------------Show and hide coordinates bar-----------------
     if(currentPosition.geometry.coordinates.length === 0){
@@ -1333,7 +1414,7 @@ function showHideElements(){
             divNavButton.style.display = "none";
             divMenu.style.height = "110px";
             divMenu.style.transform = "translateY(-18%)";
-            document.getElementById("coordinates-text").innerHTML = "";
+            textCoordinates.innerHTML = "";
         }, 1000);
     }
     else{
@@ -1369,6 +1450,26 @@ function showHideElements(){
         divMenu.style.height = "110px";
         divMenu.style.transform = "translateY(-50%)";
         }
+    }
+
+    //-----------------Show and hide navigation bar-----------------
+    if(navigationRouteInterval !== null){
+        //show
+        setTimeout(() =>{
+            instructionsDiv.style.display = "block";
+            setTimeout(()=>{
+                instructionsDiv.style.opacity = "1";
+                instructionsText.style.opacity = "1";
+            },1000);
+        },1000);
+    }
+    else{
+        //hide
+        instructionsDiv.style.opacity = "0";
+        instructionsText.style.opacity = "0";
+        setTimeout(() =>{
+            instructionsDiv.style.display = "none";
+        },1000);
     }
 }
 
