@@ -779,6 +779,7 @@ function clearMemoryNavigation(){
         map.removeLayer(currentSegmentLeafletId);
         currentSegmentLeafletId = null;
         currentInstructionIndex = 0;
+        notificationSignal = false;
 
         clearInterval(navigationRouteInterval);
         navigationRouteInterval = null;
@@ -816,7 +817,7 @@ function clearMemoryNavigation(){
 //-----------------------------------------------Cordova Plugins----------------------------------------------
 //------------------------------------------------------------------------------------------------------------
 
-//------------------------------------Compass cordova------------------------------------
+//------------------------------------Compass------------------------------------
 
 //Get the current heading
 function onSuccessCompass(heading) {
@@ -860,10 +861,7 @@ function onErrorCompass(error) {
 
 
 
-
-
-
-//-----------------------------------Dialogues cordova-----------------------------------
+//-----------------------------------Dialogues-----------------------------------
 function showAlert(message){
     //Cordova-plugin-notification
     navigator.notification.alert(message,
@@ -887,10 +885,27 @@ function onConfirm(buttonIndex){
 }
 
 
+//------------------------------------Mobile vibration------------------------------------
+function mobileVibration() {
+    navigator.vibrate(1000); //1s
+}
 
 
-
-
+//-------------------------------------Text-to-Speech-------------------------------------
+//  Test
+function mobileTTS(textInstruction) {
+    TTS.speak({
+        text: textInstruction,
+        locale: 'en-US',
+        rate: 1.0
+    },
+    () => {
+        return;
+    },
+    (error) => {
+        return;
+    });
+}
 
 
 
@@ -900,7 +915,6 @@ function onConfirm(buttonIndex){
 
 //Capture of the coordinates of the selected parking lot
 function onClickParking(marker) {
-
     //Update global variables
     selectedParkingObject = marker;
 }
@@ -1013,6 +1027,7 @@ function findRoute(selectedParkingCoords) {
 
 
 //Get the name of the icon for each instruction
+//Credits: Leaflet-Routing-Machine
 function instructionIconName(instruction, index) {
     switch (instruction.type) {
         case 'Head':
@@ -1104,13 +1119,6 @@ function processRoute(routeObject){
 
     //ELIMINAR SOLO ES PARA SIMULAR DESPLAZAMIENTO
     coords = routeCoordinates;
-    /*routeArray = routeArray.slice(-2);
-    coords = [];
-    routeArray.forEach((segment) => {
-        segment.coords.forEach((a) => {
-            coords.push(a)
-        })
-    });*/
     drawRoute();
 }
 
@@ -1180,7 +1188,7 @@ function startNavigation(){
     map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=17, {animate: true, duration: 3});
 
     //Show/Hide HTML elements
-    //showHideElements();
+    showHideElements();
 
     //Stop GET request for a route with the OSRM router
     if (findRoutInterval !== null){
@@ -1194,9 +1202,7 @@ function startNavigation(){
     document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
 
     //Navigation panel initialization
-    setTimeout(()=>{
-        drawNavigationRoute();
-    },3000);
+    drawNavigationRoute();
 }
 
 
@@ -1268,11 +1274,6 @@ function drawCurrentAndRestRoute(){
 
 function showInstruction(currentSegment, restRoute){
 
-    //Show/Hide HTML elements
-    if (currentInstructionIndex === 0){
-        showHideElements();
-    }
-
     //Icon and text instruction
     var textInstruction;
     var iconName;
@@ -1328,13 +1329,25 @@ function showInstruction(currentSegment, restRoute){
         textInstruction = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.<br>` + textNextInstruction;
         iconName = iconNameNextInstruction;
 
-        //Cordova Mobile vibration
-
-        //Cordova Mobile Voice
+        //Voice and vibration notification
+        if(!notificationSignal){
+            //mobileVibration();
+            //mobileTTS(textInstruction);
+            console.log(textInstruction);
+            notificationSignal = true;
+        }
     }
     else{
         textInstruction = textCurrentInstruction;
         iconName = iconNameCurrentInstruction;
+
+        //Voice and vibration notification
+        if (notificationSignal){
+            //mobileVibration();
+            //mobileTTS(textInstruction);
+            console.log(textInstruction);
+            notificationSignal = false;
+        }
     }
 
     iconDiv.className = iconName;
@@ -1342,13 +1355,12 @@ function showInstruction(currentSegment, restRoute){
 
     //Clear navigation memory when just arrive
     if ( currentInstructionIndex === routeArray.length-1 ){
-        console.log("eflj")
         setTimeout(()=>{
             clearMemoryNavigation();
         },15000);
     }
 }
-
+var notificationSignal = false;
 
 
 
@@ -1392,9 +1404,9 @@ function initApp(){
             setTimeout(() =>{
                 divMap.style.opacity = "1";
                 divMenu.style.opacity = "1";
-            }, 0);//1000);
-        }, 0);// 1000);
-    }, 0);//4000);
+            }, 100);
+        }, 1000);
+    }, 4000);
 }
 
 

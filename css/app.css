@@ -1,6 +1,6 @@
 
 body{
-    background: white;
+    background: linear-gradient(to bottom, #ffffff, #e0f0ff );
     color: black; /*text color*/
     font: 10pt helvetica, Arial, sans-serif; /*text font*/
     overflow: hidden;
@@ -190,7 +190,7 @@ th {background-color: #f0f0f0;}
     display: flex;
     text-align: center;
     align-items: center;
-    background: white;
+    background: linear-gradient(to bottom, #ffffff, #e0f0ff );
     justify-content: center;
     padding: 1rem;
     z-index: 2;
@@ -216,11 +216,12 @@ th {background-color: #f0f0f0;}
     animation: fadeInTransfrom 3s ease-in-out;
 }
 
-.initial-screen .animation video {
-    max-width: 100%;
+.initial-screen .animation img {
+    max-width: 80%;
     height: auto;
 
 }
+
 .initial-screen .animation {
     animation: zoomIn 3s ease-out;
 }
