@@ -82,6 +82,7 @@ var pnoa = L.tileLayer.wms(
         attribution: "&copy; CNIG"
     }
 );
+pnoa.setOpacity(0.5);
 
 //Map leaflet object
 var map = L.map("map", {
@@ -104,6 +105,7 @@ var layerControl = L.control.layers(baseMaps).addTo(map);
 var leafletCurrentPositionId = null;
 var leafletParkingsIdArray = [];
 var leafletRouteId = null;
+var currentSegmentLeafletId = null;
 
 
 //-----------------------------------Navigation----------------------------------
@@ -129,6 +131,15 @@ var drawRouteOptions = {
     lineJoin: 'round',
 };
 
+//Current segment draw options
+var currentSegmentDrawRouteOptions = Object.assign({}, drawRouteOptions);
+currentSegmentDrawRouteOptions.color = 'rgba(255, 93, 0, 0.6)';
+
+//for update navigation instructions
+var currentInstructionIndex = 0;
+
+
+var coords = null;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
 
 
 
@@ -137,7 +148,7 @@ var drawRouteOptions = {
 //Format coordinates: geographic coordinates
 var formatCoords = "geo";
 
-//Search distance squared
+//Parking search radius
 var refDistance = 1500;//1.5km
 var squareDistanceRef = Math.pow(refDistance, 2);
 
@@ -149,6 +160,7 @@ var getParkingTimeout = null;
 var getParkingInterval = null;
 var showParkingInterval = null;
 var findRoutInterval = null;
+var navigationRouteInterval = null;
 
 
 
@@ -269,9 +281,9 @@ function geolocationSucess(position){
         var newLatLng = L.latLng(currentPosition.geometry.coordinates[1], currentPosition.geometry.coordinates[0]);//[lat,lng]
 
         //ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
-        if (coords.length !== 0 && navigationRouteInterval !== null){
+        if (coords !== null && navigationRouteInterval !== null){
             f+=1;
-            newLatLng = L.latLng(coords[f][0], coords[f][1]);
+            newLatLng = L.latLng(coords[f].lat, coords[f].lng);
         }
 
         leafletCurrentPositionId.setLatLng(newLatLng);
@@ -547,14 +559,13 @@ function getCustomParkingIcon(point) {
     popup += "<tr><th>Longitud</th><td>" + point.geometry.coordinates[0].toFixed(8)+ "</td></tr>";
     popup += "<tr><th>Plazas totales</th><td>" +  point.properties.total_parking +"</td></tr>";
     popup += "<tr><th>Plazas libres</th><td>" + point.properties.free_parking + "</td></tr>";
-    popup += "<tr><th>Fecha</th><td>" + point.properties.last_update + "</td></tr>";
+    popup += "<tr><th>Fecha</th><td>" + formatDate(point.properties.last_update) + "</td></tr>";
     popup += "</table><br/>";
     popup +="<div class='btn'><button type='button' class='btn_navigation' onclick='onlySelectedParkingOnMap()'>Get a route to parking?</button></div>";
     popup += "</div>";
 
     return [popup, parkingIcon];
 }
-
 
 
 //------Show nerby parkings------
@@ -752,7 +763,6 @@ function clearMemoryNavigation(){
         map.removeLayer(leafletRouteId);
         leafletRouteId = null;
         routeArray = [];
-        routeSummary = null;
     }
 
     //Remove the selected parking from the map
@@ -1052,7 +1062,7 @@ function processRoute(routeObject){
     //Get data
     var routeCoordinates = routeObject.coordinates;
     var routeInstructions = routeObject.instructions;
-    routeSummary = routeObject.summary;
+    var routeSummary = routeObject.summary;
     showToast('Distance to selected parking: ' + routeSummary.totalDistance + ' meters');
 
     //Add the name of the icon each instruction
@@ -1093,14 +1103,14 @@ function processRoute(routeObject){
     routeArray.push(instruction);
 
     //ELIMINAR SOLO ES PARA SIMULAR DESPLAZAMIENTO
-    //coords = routeCoordinates;
-    routeArray = routeArray.slice(-2);
+    coords = routeCoordinates;
+    /*routeArray = routeArray.slice(-2);
     coords = [];
     routeArray.forEach((segment) => {
         segment.coords.forEach((a) => {
             coords.push(a)
         })
-    });
+    });*/
     drawRoute();
 }
 
@@ -1196,15 +1206,6 @@ function startNavigation(){
 
 
 
-var coords = [];//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
-var navigationRouteInterval = null;
-var currentInstructionIndex = 0;
-var currentSegmentLeafletId = null;
-var routeSummary = null;
-
-//Current segment draw options
-var currentSegmentDrawRouteOptions = Object.assign({}, drawRouteOptions);
-currentSegmentDrawRouteOptions.color = 'rgba(255, 93, 0, 0.6)';
 
 function drawNavigationRoute(){
 
@@ -1251,7 +1252,7 @@ function drawCurrentAndRestRoute(){
         currentSegmentLeafletId = L.polyline(currentSegment.coords, currentSegmentDrawRouteOptions).addTo(map);
         leafletRouteId = L.polyline(restRoutlatlngs, drawRouteOptions).addTo(map);
     }
-    else{//if (currentInstructionIndex === routeArray.length-1){
+    else{//final segment
         var currentSegment = routeArray[currentInstructionIndex];
         var restRoute = currentSegment;
         var restRoutlatlngs = restRoute.coords;
@@ -1268,9 +1269,9 @@ function drawCurrentAndRestRoute(){
 function showInstruction(currentSegment, restRoute){
 
     //Show/Hide HTML elements
-    /*if (currentInstructionIndex === 0){
+    if (currentInstructionIndex === 0){
         showHideElements();
-    }*/
+    }
 
     //Icon and text instruction
     var textInstruction;
@@ -1317,10 +1318,19 @@ function showInstruction(currentSegment, restRoute){
 
     //Set text and icon
     if (ratio > 0.7 ){//70% of the route has already been covered.
-        //FALTA SOLUCIONAR ULTIMA INDICACIÓN
+
+        //Arrived to destination
+        if (currentInstructionIndex === routeArray.length-2){
+            textNextInstruction = routeArray.slice(currentInstructionIndex+1)[0].text;
+            iconNameNextInstruction = routeArray.slice(currentInstructionIndex+1)[0].icon
+        }
         //MENSAJE Y VIBRACION TIENEN QUE IR AQUI CON UNA CONSFICION PARA QUE SOLO SE EJECUTE UNA VEZ SE ALCANZA EL 70% DEL SEGMENTO ACTUAL NAVEGADO.
-        textInstruction = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.\n` + textNextInstruction;
+        textInstruction = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.<br>` + textNextInstruction;
         iconName = iconNameNextInstruction;
+
+        //Cordova Mobile vibration
+
+        //Cordova Mobile Voice
     }
     else{
         textInstruction = textCurrentInstruction;
@@ -1669,3 +1679,25 @@ function formatCoordinates(){
     document.getElementById("coordinates-text").innerHTML = coordinatesString;
 }
 
+
+function formatDate(string){
+
+    if (string !== null ){
+        var dateObj = new Date(string);
+
+        //Date
+        var day = String(dateObj.getUTCDate()).padStart(2, '0');
+        var month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        var year = dateObj.getUTCFullYear();
+
+        //Time
+        var hours = String(dateObj.getUTCHours()).padStart(2, '0');
+        var minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
+
+        // Combinar en el formato deseado
+        var formattedDate = `${day}/${month}/${year} <br> ${hours}:${minutes}`;
+
+        return (formattedDate);
+    }
+    return string;
+}
