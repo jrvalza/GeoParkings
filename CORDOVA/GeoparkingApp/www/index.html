@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <!--Metadata-->
+        <meta charset="UTF-8">
+        <!--
+        Customize this policy to fit your own app's needs. For more guidance, please refer to the docs:
+            https://cordova.apache.org/docs/en/latest/
+        Some notes:
+            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
+            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
+                * Enable inline JS: add 'unsafe-inline' to default-src
+        -->
+
+        <!--Config for mobile-->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <!--<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src *;">
+        <meta name="format-detection" content="telephone=no">
+        <meta name="msapplication-tap-highlight" content="no">
+        <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
+        <meta name="color-scheme" content="light dark">
+        <link rel="stylesheet" href="css/index.css">
+        -->
+
+        <title>GeoParkings</title>
+
+        <!--Import css from local folder-->
+        <link rel="stylesheet" type="text/css" href="./css/leaflet.css">
+        <!--link rel="stylesheet" type="text/css" href="./css/leaflet-routing-machine.css"-->
+        <link rel="stylesheet" type="text/css" href="./css/all.css">
+        <link rel="stylesheet" type="text/css" href="./css/app.css">
+    </head>
+
+    <body>
+
+        <!--map screen-->
+        <!--show coordinates-->
+        <div id="coordinates">
+            <p id="coordinates-text"></p>
+        </div>
+
+        <!--show map-->
+        <div id="map">
+        </div>
+
+        <!--menu icons-->
+        <div id="menu">
+            <i class="fa-solid fa-location-dot"></i>
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <i class="fa-solid fa-route"></i>
+        </div>
+
+        <!--toast-->
+        <div>
+            <p id="toast" style="display: block;"></p>
+        </div>
+
+        <!--initial screen-->
+        <div id="initial-screen-container">
+            <div class="initial-screen">
+                <h1>Geoparking App</h1>
+                <div class="animation">
+                    <img src="./css/images/inicio.gif">
+                </div>
+                <h2>"Discover parking spots near you in seconds"</h2>
+            </div>
+        </div>
+
+        <!--route instructions-->
+        <div id="instructions">
+            <p id="instructions-text"></p>
+        </div>
+
+        <!--Import js from local local folder-->
+        <script src="cordova.js"></script>
+        <script language="JavaScript" type="text/javascript" src ="./js/leaflet.js"></script>
+        <script language="JavaScript" type="text/javascript" src="./js/leaflet-routing-machine.js"></script>
+        <script language="JavaScript" type="text/javascript" src="./js/proj4.js"></script>
+        <script language="JavaScript" type="text/javascript" src="./js/app.js"></script>
+
+    </body>
+</html>

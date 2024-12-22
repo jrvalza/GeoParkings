@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="edu.upv.geoparkingapp" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>GeoparkingApp</name>
+    <description> A simple Apache Cordova application with geolocation maps and navigation instructions for searching nearby parking lots. </description>
+    <author email="juavaa2@upv.edu.es" href="https://personales.upv.es/juavaal2"> Master's student in Geomatics Engineering and Geoinformation. </author>
+    <content src="index.html" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <platform name="android">
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="./www/img/splash.png" />
+        <preference name="AndroidWindowSplashScreenBackground" value="#ffffff" />
+        <icon src="./www/img/iconApp.png" />
+    </platform>
+</widget>
+
+

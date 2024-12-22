@@ -77,12 +77,36 @@ var pnoa = L.tileLayer.wms(
     "http://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&",
     {layers: "OI.OrthoimageCoverage",
         tranparent: true,
-        format: "image/jpeg",
+        format: "image/png",
         version: "1.3.0",
         attribution: "&copy; CNIG"
     }
 );
 pnoa.setOpacity(0.5);
+
+//CartoDB
+var CartoDB_Positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+	attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	subdomains: 'abcd',
+	maxZoom: 20
+});
+
+//StadiaDark
+var Stadia_AlidadeSmoothDark = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.{ext}', {
+	minZoom: 0,
+	maxZoom: 20,
+	attribution: '&copy; <a href="https://www.stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	ext: 'png'
+});
+
+//StadiaSatellite
+var Stadia_AlidadeSatellite = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_satellite/{z}/{x}/{y}{r}.{ext}', {
+	minZoom: 0,
+	maxZoom: 20,
+	attribution: '&copy; <a href="https://www.stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	ext: 'jpg'
+});
+Stadia_AlidadeSatellite.setOpacity(0.5);
 
 //Map leaflet object
 var map = L.map("map", {
@@ -95,8 +119,11 @@ var map = L.map("map", {
 
 //All base maps options
 var baseMaps = {
+    "CartoDB": CartoDB_Positron,
+    "StadiaDark": Stadia_AlidadeSmoothDark,
+    "StadiaSatellite": Stadia_AlidadeSatellite,
+    "Ortofoto PNOA": pnoa,
     "OpenStreetMap": osm,
-    "Ortofoto PNOA": pnoa
 };
 
 var layerControl = L.control.layers(baseMaps).addTo(map);
@@ -140,9 +167,6 @@ var currentInstructionIndex = 0;
 
 //for mobile vibration and voice notification
 var notificationSignal = false;
-
-var coords = null;//ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
-
 
 
 //-----------------------------Default configuration-----------------------------
@@ -211,50 +235,39 @@ function toggleLocation(){
         watchID = navigator.geolocation.watchPosition(geolocationSucess, geolocationError, geolocationOptions);
 
         //Watch the compass sensor
-        //watchCompassID = navigator.compass.watchHeading(onSuccessCompass, onErrorCompass, compassOptions);
+        watchCompassID = navigator.compass.watchHeading(onSuccessCompass, onErrorCompass, compassOptions);
     }
     else{
 
         //Clear memory
-        var response = clearMemory();
-        if (!response){
-            return;
-        };
+        clearMemory().then((response) =>{
+            if (response === 2){//cancel
+                return;
+            }
 
-        //cordova
-        /*var response = clearMemory();
-        if (response === 2){//cancel
-            return;
-        };*/
+            //Stop Geolocation
+            showToast("Stopping geolocation service.");
+            navigator.geolocation.clearWatch(watchID)// clean geolocation
+            watchID=null;
 
-
-        //Stop Geolocation
-        showToast("Stopping geolocation service.");
-        navigator.geolocation.clearWatch(watchID)// clean geolocation
-        watchID=null;
-
-        //Stop the compass sensor
-        //navigator.compass.clearWatch(watchCompassID);
-        //watchCompassID = null;
+            //Stop the compass sensor
+            navigator.compass.clearWatch(watchCompassID);
+            watchCompassID = null;
+        });
     }
 }
 
 
-var a = 0;//BORRAR AL PASAR A CORDOVA
-var f = 0;
+
+
 //Geolocation success
 function geolocationSucess(position){
-
-    //PRUEBA---------BORRAR AL PASAR A CORDOVA
-    a +=0.00001;
-    var dlat = -2*a;
-    var dlon = -a
 
     //Change color: geolocaton icon
     document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "cyan";
 
     //Fill a global var currentPosition (geojson)
-    currentPosition.geometry.coordinates = [position.coords.longitude + dlon, position.coords.latitude + dlat];
+    currentPosition.geometry.coordinates = [position.coords.longitude, position.coords.latitude];
     currentPosition.properties.accuracy = position.coords.accuracy;
     currentPosition.properties.timestamp = position.timestamp;
 
@@ -271,22 +284,9 @@ function geolocationSucess(position){
         initialPosition.geometry.coordinates = currentPosition.geometry.coordinates;
     }
 
-    //PRUEBA-------------BORRAR AL PASAR A CORDOVA
-    if (leafletCurrentPositionId === null && currentPosition.geometry.coordinates.length !==0){
-        compassAngle = -45
-        drawCurrentPosition(compassAngle);
-        map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=16, {animate: true, duration: 3});
-    }
-
     //Update the coordinates of our position marker
     if (leafletCurrentPositionId !== null){
         var newLatLng = L.latLng(currentPosition.geometry.coordinates[1], currentPosition.geometry.coordinates[0]);//[lat,lng]
-
-        //ELIMINAR SOLO ES PARA SIMULAR QUE NOS DESPLAZAMOS
-        if (coords !== null && navigationRouteInterval !== null){
-            f+=1;
-            newLatLng = L.latLng(coords[f].lat, coords[f].lng);
-        }
 
         leafletCurrentPositionId.setLatLng(newLatLng);
 
@@ -328,17 +328,6 @@ function geolocationError(error){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 //------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------Parkings--------------------------------------------------
 //------------------------------------------------------------------------------------------------------------
@@ -348,10 +337,8 @@ function findParkings(){
 
     //Check status of geolocation
     if (watchID === null){
-        alert("It is necessary to know your location before searching for parking spaces.");
-
-        //cordova
-        //showAlert("It is necessary to know your location before searching for parking spaces.");
+        mobileVibration();
+        showAlert("It is necessary to know your location before searching for parking spaces.");
         return;
     }
 
@@ -666,21 +653,13 @@ function drawCurrentPosition(compassAngle){
 //------------------------------------------------------------------------------------------------------------
 //-------------------------------------------Clear memory and map---------------------------------------------
 //------------------------------------------------------------------------------------------------------------
-function clearMemory(){
+async function clearMemory(){
 
     //Ask to clear memory
-    var clearMemory = confirm("Stop geolocation?");
-    if (!clearMemory){
-        return clearMemory;
-    }
-
-    //Cordova
-    //Ask to clear memory
-    /*var buttonIndex = onConfirm("Stop geolocation?");
-
+    var buttonIndex = await showConfirm("Stop geolocation?");
     if (buttonIndex === 2){//cancel clear memory
         return buttonIndex;
-    }*/
+    }
 
     //Clear memory
     distance_t_t1 = null;
@@ -753,8 +732,7 @@ function clearMemory(){
     document.getElementsByClassName("fa-solid fa-location-dot")[0].style.color = "black";
     document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
 
-    return clearMemory;
-    //return buttonIndex;
+    return buttonIndex;
 }
 
 
@@ -868,28 +846,29 @@ function showAlert(message){
     //Cordova-plugin-notification
     navigator.notification.alert(message,
                                 function (){},//callback anonymous function
-                                "GeoParkings", //title
+                                "GeoParking App: Alert!", //title
                                 "Ok"//name of option
                             );
 }
-function showConfirm(message){
-    //Cordova-plugin-notification
-    navigator.notification.confirm(message,
-                                onConfirm,//callback function
-                                "GeoParkings", //title
-                                ["OK","Cancel"]//name of options -> user bottoms. Ok=1, Cancel=2
-                            );
-}
 
-//Callback function to confirm a user action
-function onConfirm(buttonIndex){
-    return buttonIndex;
+function showConfirm(message) {
+    mobileVibration();
+    return new Promise((resolve, reject) => {
+        navigator.notification.confirm(
+            message,
+            function(buttonIndex) {
+                resolve(buttonIndex);
+            },
+            "GeoParking App: Choose option",
+            ["OK", "Cancel"]
+        );
+    });
 }
 
 
 //------------------------------------Mobile vibration------------------------------------
 function mobileVibration() {
-    navigator.vibrate(1000); //1s
+    navigator.vibrate(500); //0.5s
 }
 
 
@@ -899,7 +878,7 @@ function mobileTTS(textInstruction) {
     TTS.speak({
         text: textInstruction,
         locale: 'en-US',
-        rate: 1.0
+        rate: 0.9
     },
     () => {
         return;
@@ -924,23 +903,16 @@ function onClickParking(marker) {
 
 
 //Parking popup button function
-function onlySelectedParkingOnMap(){
+async function onlySelectedParkingOnMap(){
 
-    //Ask if you want to start searching for a route
-    var searchRoute = confirm("Do you want to find a route to the selected parking lot?");
-    if (!searchRoute) {
+    //Ask to find a route
+    var searchRoute = await showConfirm("Do you want to find a route to the selected parking lot?");
+    if (searchRoute === 2){//Cancel
         return;
     }
 
-    /*//Cordova
-    //Ask to find a route
-    var searchRoute = onConfirm("Do you want to find a route to the selected parking lot?");
-    if (searchRoute === 2){//Cancel
-        return
-    }*/
-
    //Close popup
-   map.closePopup();
+    map.closePopup();
 
     //Check that the leaflet object has been obtained from the selected parking lot.
     if (selectedParkingObject === null && leafletParkingsIdArray.length === 0){
@@ -978,9 +950,9 @@ function onlySelectedParkingOnMap(){
         //Update route each 10s and in case of change of position in more than 50m
         findRoutInterval = setInterval(() => {
 
-            if (distance_t_t1 < 2500) {
+            /*if (distance_t_t1 < 2500) {
                 return;
-            }
+            }*/
             findRoute(selectedParkingCoords);
         }, 10000); // 10s
     }
@@ -1081,6 +1053,7 @@ function processRoute(routeObject){
     var routeInstructions = routeObject.instructions;
     var routeSummary = routeObject.summary;
     showToast('Distance to selected parking: ' + routeSummary.totalDistance + ' meters');
+    mobileTTS('Distance to selected parking: ' + routeSummary.totalDistance + ' meters');
 
     //Add the name of the icon each instruction
     routeInstructions.forEach((instruction, index) => {
@@ -1119,8 +1092,6 @@ function processRoute(routeObject){
     //Update global varieble
     routeArray.push(instruction);
 
-    //ELIMINAR SOLO ES PARA SIMULAR DESPLAZAMIENTO
-    coords = routeCoordinates;
     drawRoute();
 }
 
@@ -1158,59 +1129,69 @@ function drawRoute() {
 
 
 
-function startNavigation(){
+async function startNavigation(){
 
-    //Ask if you want to start navigation on route
-    var startNavigation = confirm("Do you want to start navigating the found route?");
+    //Start or cancel navigation instructions
+    if (navigationRouteInterval === null){
+        //Ask
+        var startNavigation = await showConfirm("Do you want to start navigating the found route?");
 
-    /*//Cordova
-    //Ask to find a route
-    var searchRoute = onConfirm("Do you want to start navigating the found route?");
-    if (searchRoute === 2){//Cancel
-        return
-    }*/
+        //startNavigation=2. Cancel option
+        if (startNavigation === 2) {
 
-    //1.Cancel option
-    if (!startNavigation) {
+            //Show/Hide HTML elements
+            showHideElements();
+
+            //Remove and clear all variebale of navigation
+            clearMemoryNavigation();
+
+            //Start again the search for nearby parking lots
+            findParkings();
+
+            return;
+        }
+        //Zoom to current position
+        map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=17, {animate: true, duration: 3});
 
         //Show/Hide HTML elements
         showHideElements();
 
-        //Remove and clear all variebale of navigation
-        clearMemoryNavigation();
+        //Stop GET request for a route with the OSRM router
+        if (findRoutInterval !== null){
+            clearInterval(findRoutInterval);
+            findRoutInterval = null;
+        }
 
-        //Start again the search for nearby parking lots
-        findParkings();
+        //Change color of the findParking button and icon route
+        document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
+        document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
 
-        return;
+        //Navigation panel initialization
+        drawNavigationRoute();
     }
+    else{
+        //Ask
+        var stopNavigation = await showConfirm("Do you want to cancel navigation along the current route?");
 
-    //2.Acept option
-    //Zoom to current position
-    map.flyTo(currentPosition.geometry.coordinates.toReversed(), zoomLevel=17, {animate: true, duration: 3});
+        //stopNavigation=1. Ok option
+        if (stopNavigation === 1) {
 
-    //Show/Hide HTML elements
-    showHideElements();
+            //Show/Hide HTML elements
+            showHideElements();
 
-    //Stop GET request for a route with the OSRM router
-    if (findRoutInterval !== null){
-        clearInterval(findRoutInterval);
-        findRoutInterval = null;
+            //Remove and clear all variebale of navigation
+            clearMemoryNavigation();
+
+            //Start again the search for nearby parking lots
+            findParkings();
+
+            return;
+        }
+        else{
+            return;
+        }
     }
-
-
-    //Change color of the findParking button and icon route
-    document.getElementsByClassName("fa-solid fa-magnifying-glass")[0].style.color = "black";
-    document.getElementsByClassName("fa-solid fa-route")[0].style.color = "cyan";
-
-    //Navigation panel initialization
-    drawNavigationRoute();
 }
-
-
-
-
-
 
 
 
@@ -1225,7 +1206,7 @@ function drawNavigationRoute(){
     //Remove found route
     map.removeLayer(leafletRouteId);
     leafletRouteId = null;
-    console.log(routeArray);
+
     //Show instructions for each 1 second
     navigationRouteInterval = setInterval(() => {
         map.panTo(leafletCurrentPositionId.getLatLng());
@@ -1275,6 +1256,7 @@ function drawCurrentAndRestRoute(){
 
 
 function showInstruction(currentSegment, restRoute){
+    showHideElements();
 
     //Icon and text instruction
     var textInstruction;
@@ -1327,30 +1309,35 @@ function showInstruction(currentSegment, restRoute){
             textNextInstruction = routeArray.slice(currentInstructionIndex+1)[0].text;
             iconNameNextInstruction = routeArray.slice(currentInstructionIndex+1)[0].icon
         }
-        //MENSAJE Y VIBRACION TIENEN QUE IR AQUI CON UNA CONSFICION PARA QUE SOLO SE EJECUTE UNA VEZ SE ALCANZA EL 70% DEL SEGMENTO ACTUAL NAVEGADO.
+
         textInstruction = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.<br>` + textNextInstruction;
+        var textInstructionVoice = `In ${Math.ceil(currentSegment.distance - currentSegment.distance*ratio)} meters.` + textNextInstruction;
         iconName = iconNameNextInstruction;
 
-        console.log("IF: " + currentInstructionIndex + "  " + iconName);
-        //Voice and vibration notification
-        if(!notificationSignal){
-            //mobileVibration();
-            //mobileTTS(textInstruction);
-            console.log(textInstruction);
-            notificationSignal = true;
+        //Voice and vibration notification when ratio > 70%
+        if(notificationSignal){
+            mobileVibration();
+            mobileTTS(textInstructionVoice);
+            notificationSignal = false;
         }
     }
     else{
         textInstruction = textCurrentInstruction;
         iconName = iconNameCurrentInstruction;
 
-        console.log("ELSE: " + currentInstructionIndex + "  " + iconName);
-
         //Voice and vibration notification
-        if (notificationSignal){
-            //mobileVibration();
-            //mobileTTS(textInstruction);
-            notificationSignal = false;
+        //First instruction
+        if ( currentInstructionIndex === 0 && !notificationSignal){
+            mobileVibration();
+            mobileTTS(textInstruction);
+            notificationSignal = true;
+        }
+
+        //Following instructions
+        if (!notificationSignal){
+            mobileVibration();
+            mobileTTS(textInstruction);
+            notificationSignal = true;
         }
     }
 
@@ -1358,7 +1345,15 @@ function showInstruction(currentSegment, restRoute){
     instructionsText.innerHTML = textInstruction;
 
     //Clear navigation memory when just arrive
-    if ( currentInstructionIndex === routeArray.length-1){
+    if ( currentInstructionIndex === routeArray.length-1 ){
+
+        //Voice and vibration notification
+        //Last instruction
+        if (notificationSignal !== "break"){
+            mobileVibration();
+            mobileTTS(textInstruction);
+            notificationSignal = "break"; // To break True/False sequence
+        }
         setTimeout(()=>{
             clearMemoryNavigation();
         },10000);
@@ -1379,6 +1374,7 @@ function initApp(){
     var divCoordinates = document.getElementById("coordinates");
     var divInitialScreen = document.getElementById("initial-screen-container");
     var divInstructions = document.getElementById("instructions");
+
     //Hide HTML elements
     divMap.style.display = "None";
     divMenu.style.display = "None";
@@ -1475,7 +1471,7 @@ function showHideElements(){
             setTimeout(()=>{
                 instructionsDiv.style.opacity = "1";
                 instructionsText.style.opacity = "1";
-            },1000);
+            },500);
         },1000);
     }
     else{
@@ -1534,7 +1530,7 @@ function geoToUTM(geoPoint){//geopoint=[lng, lat]
 
     //Get UTM zone
     var longitude = geoPoint[0];
-    var zone = 1 + Math.floor((longitude+180)/6);//source: https://stackoverflow.com/questions/29655256/proj4js-can-you-convert-a-lat-long-to-utm-without-a-zone
+    var zone = 1 + Math.floor((longitude+180)/6);
 
     //From geo to utm
     //Origin and target CRSs
@@ -1579,6 +1575,7 @@ function formatCoordinates(){
 
     //Check there are coordinates
     if (currentPosition.geometry.coordinates.length === 0){
+        mobileVibration();
         showAlert("It is necessary to know your position before changing the coordinate format.");
         return;
     }
@@ -1706,3 +1703,6 @@ function formatDate(string){
     }
     return string;
 }
+
+
+
