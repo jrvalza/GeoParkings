@@ -1,0 +1,37 @@
+# Requisitos para compilar/ejecutar GeoParkings (versión móvil - Apache Cordova)
+
+## Entorno de desarrollo
+- Node.js >= 18.x
+- npm >= 9.x
+- Apache Cordova CLI >= 12.x  (npm install -g cordova)
+- Android SDK (API level acorde a cordova-android 13.x)
+- Java JDK 17 (requerido por Gradle/Android SDK)
+- Gradle (gestionado automáticamente por cordova-android)
+
+## Plataforma Cordova
+- cordova-android ^13.0.0
+
+## Plugins Cordova (definidos en package.json)
+- cordova-plugin-geolocation ^5.0.0         -> Geolocalización GPS del usuario
+- cordova-plugin-device-orientation ^3.0.0  -> Brújula / orientación del dispositivo
+- cordova-plugin-tts ^0.2.3                 -> Síntesis de voz para instrucciones de navegación
+- cordova-plugin-vibration ^3.1.1           -> Vibración en notificaciones de navegación
+- cordova-plugin-dialogs ^2.0.2             -> Alertas y confirmaciones nativas
+
+## Instalación de dependencias
+
+```bash
+cd CORDOVA/GeoparkingApp
+npm install
+cordova platform add android
+cordova plugin add cordova-plugin-geolocation
+cordova plugin add cordova-plugin-device-orientation
+cordova plugin add cordova-plugin-tts
+cordova plugin add cordova-plugin-vibration
+cordova plugin add cordova-plugin-dialogs
+cordova plugin add cordova-plugin-splashscreen
+```
+
+## Permisos necesarios en el dispositivo Android
+- Ubicación (GPS) - ACCESS_FINE_LOCATION
+- Conexión a internet (consulta de API de parkings y servicio de rutas OSRM)
