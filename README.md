@@ -29,8 +29,8 @@
 
 - 📍 Geolocalización en tiempo real del usuario
 - 🔎 Búsqueda de estacionamientos cercanos (radio máximo de 1.5 km)
-- 🔄 Disponibilidad de plazas actualizada vía API del Ayuntamiento de Valencia
--
+- 🔄 Consulta de la disponibilidad de plazas de aparcamiento vía API del Ayuntamiento de Valencia
+- 🚗 Cálculo de rutas óptimas en modo *car driving* vía OSRM
 - 🧭 Navegación guiada paso a paso, con instrucciones por voz (TTS) y alertas por vibración
 - 💻 Interfaz sencilla e intuitiva
 
