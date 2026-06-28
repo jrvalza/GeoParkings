@@ -142,4 +142,3 @@ cordova build android
 - El cálculo de rutas depende del servidor público de **OSRM**, por lo que requiere conexión a internet y puede verse afectado por la disponibilidad de dicho servicio.
 - La API de parkings de Valencia puede limitar el número de peticiones; la app realiza consultas periódicas controladas para evitar bloqueos.
 - Las instrucciones de navegación por voz (TTS) y la vibración solo están disponibles en el entorno móvil (no aplican si se ejecuta como página web en escritorio).
-- El proyecto fue desarrollado en el contexto de un Máster en Ingeniería Geomática y Geoinformación.
