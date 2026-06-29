@@ -12,6 +12,7 @@
 ---
 
 ![Inicio app](misc/movie0.gif)
+
 ---
 
 ## 📑 Tabla de contenidos
@@ -87,11 +88,10 @@ GeoParkings/
 
 ### 🗣️ Navegación guiada
 ![Instrucciones de navegación](misc/movie3.gif)
+
 ---
 
 ## ⚙️ Compilación e instalación
-
-### 🛠️ Compilar desde el código fuente
 
 ```bash
 git clone https://github.com/jrvalza/GeoParkings.git
