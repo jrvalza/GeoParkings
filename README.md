@@ -6,10 +6,11 @@
 ![CSS3](https://img.shields.io/badge/CSS3-Styles-1572B6?logo=css3&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-UI-E34F26?logo=html5&logoColor=white)
 ![Cordova](https://img.shields.io/badge/Apache%20Cordova-Mobile%20App-35434F?logo=apachecordova&logoColor=white)
-![Leaflet](https://img.shields.io/badge/Leaflet.js-Maps-199900?logo=leaflet&logoColor=white)
-![OSRM](https://img.shields.io/badge/OSRM-Routing-0066CC)
+![Leaflet](https://img.shields.io/badge/Leaflet-Maps-199900?logo=leaflet&logoColor=white)
+![OSRM](https://img.shields.io/badge/OSRM-RoutingMachine-0066CC)
 
 ---
+
 ![Inicio app](misc/movie0.gif)
 ---
 
@@ -22,7 +23,6 @@
 - [Compilación e instalación](#️-compilación-e-instalación)
 - [Tecnologías usadas](#-tecnologías-usadas)
 - [Notas](#-notas)
-
 ---
 
 ## 🚀 Funcionalidades
@@ -33,9 +33,6 @@
 - 🚗 Cálculo de rutas óptimas en modo *car driving* vía OSRM
 - 🧭 Navegación guiada paso a paso, con instrucciones por voz (TTS) y alertas por vibración
 - 💻 Interfaz sencilla e intuitiva
-
-> ⚠️ Las funcionalidades de búsqueda de parkings, cálculo de ruta e instrucciones de navegación dependen de servicios externos en tiempo real (API de datos abiertos de Valencia y servidor público de OSRM). Su disponibilidad y precisión pueden variar según la cobertura de red, el estado de dichos servicios y la zona geográfica (la búsqueda de parkings está limitada a la ciudad de Valencia).
-
 ---
 
 ## 📁 Estructura del proyecto
@@ -63,7 +60,6 @@ GeoParkings/
 ├── README.md
 └── requirements.txt
 ```
-
 ---
 
 ## 🧩 Datos y plugins
@@ -81,7 +77,6 @@ GeoParkings/
 | `cordova-plugin-vibration` | Alertas por vibración |
 
 **Otras dependencias:** [Leaflet.js](https://leafletjs.com/) (mapas), [OSRM](http://project-osrm.org/) (routing engine) y [Proj4.js](https://github.com/proj4js/proj4js) (gestión de coordenadas).
-
 ---
 
 ## 🖼️ Capturas de pantalla
@@ -94,7 +89,6 @@ GeoParkings/
 
 ### 🗣️ Navegación guiada
 ![Instrucciones de navegación](misc/movie3.gif)
-
 ---
 
 ## ⚙️ Compilación e instalación
@@ -118,7 +112,6 @@ cordova build android
 
 - El `.apk` resultante se genera en `platforms/android/app/build/outputs/apk/`.
 - Instalar el fichero .apk en el movil o emular la app con Android Studio.
-
 ---
 
 ## 🧠 Tecnologías usadas
@@ -131,14 +124,16 @@ cordova build android
 | 🧭 OSRM API | Cálculo de rutas |
 | 🅿️ API Ayuntamiento de Valencia | Datos de parkings en tiempo real |
 | 🗺️ OpenStreetMap / PNOA (IGN) | Capas base del mapa (callejero y ortofoto) |
-
 ---
-
 
 ## 📌 Notas
 
 - ✅ La versión **móvil (Android, .apk)** es la única probada y completamente funcional del proyecto; es la forma recomendada de usar la aplicación.
+
 - La búsqueda de parkings está limitada actualmente a los datos abiertos de la ciudad de **Valencia**; fuera de esa zona no se mostrarán resultados.
+
 - El cálculo de rutas depende del servidor público de **OSRM**, por lo que requiere conexión a internet y puede verse afectado por la disponibilidad de dicho servicio.
+
 - La API de parkings de Valencia puede limitar el número de peticiones; la app realiza consultas periódicas controladas para evitar bloqueos.
+
 - Las instrucciones de navegación por voz (TTS) y la vibración solo están disponibles en el entorno móvil (no aplican si se ejecuta como página web en escritorio).
