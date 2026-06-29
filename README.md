@@ -64,7 +64,7 @@ GeoParkings/
 
 ## 🧩 Datos y plugins
 
-**Fuente de datos:** API del Ayuntamiento de Valencia (dataset `parkings`), plazas totales/libres y fecha de actualización, vía peticiones HTTP GET en formato JSON.
+**Fuente de datos:** API del Ayuntamiento de Valencia (dataset `parkings`), plazas totales/libres y fecha de actualización, vía peticiones HTTP GET en formato GeoJSON.
 
 **Plugins de Cordova:**
 
@@ -75,8 +75,6 @@ GeoParkings/
 | `cordova-plugin-dialogs` | Alertas al usuario |
 | `cordova-plugin-tts` | Instrucciones por voz |
 | `cordova-plugin-vibration` | Alertas por vibración |
-
-**Otras dependencias:** [Leaflet.js](https://leafletjs.com/) (mapas), [OSRM](http://project-osrm.org/) (routing engine) y [Proj4.js](https://github.com/proj4js/proj4js) (gestión de coordenadas).
 ---
 
 ## 🖼️ Capturas de pantalla
