@@ -91,7 +91,7 @@ GeoParkings/
 
 ---
 
-## ⚙️ Compilación e instalación
+## ⚙️ Compilación
 
 ```bash
 git clone https://github.com/jrvalza/GeoParkings.git
